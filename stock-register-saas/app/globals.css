@@ -1,0 +1,544 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #0b0f0c;
+  --color-paper: #ffffff;
+  --color-muted: #eef1ee;
+  --color-surface: #f3f5f0;
+  --color-in: #15803d;
+  --color-out: #dc2626;
+  --color-low: #b45309;
+  --color-brand: #16a34a;
+  --color-brand-soft: #dcfce7;
+}
+
+:root {
+  /* Depth: a highlight on top, a hairline below, then two soft drop layers. */
+  --shadow-3d:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.9), inset 0 -2px 0 0 rgb(11 15 12 / 0.05), 0 1px 2px rgb(11 15 12 / 0.06),
+    0 6px 14px -4px rgb(11 15 12 / 0.12), 0 18px 32px -14px rgb(11 15 12 / 0.18);
+  --shadow-3d-lg:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.9), inset 0 -2px 0 0 rgb(11 15 12 / 0.05), 0 2px 4px rgb(11 15 12 / 0.06),
+    0 14px 26px -8px rgb(11 15 12 / 0.18), 0 32px 48px -20px rgb(11 15 12 / 0.26);
+  --shadow-well: inset 0 2px 4px rgb(11 15 12 / 0.08), inset 0 0 0 1px rgb(11 15 12 / 0.02);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+/* ---------- Soft 3D surfaces ---------- */
+
+.card-3d {
+  background: var(--color-paper);
+  border: 1.5px solid rgb(11 15 12 / 0.14);
+  border-radius: 1.1rem;
+  box-shadow: var(--shadow-3d);
+}
+
+.card-3d-dark {
+  background: linear-gradient(160deg, #18211b 0%, var(--color-ink) 70%);
+  color: var(--color-paper);
+  border: 1.5px solid #000;
+  border-radius: 1.1rem;
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.12),
+    0 14px 26px -8px rgb(11 15 12 / 0.35),
+    0 32px 48px -20px rgb(11 15 12 / 0.45);
+}
+
+/* Tilts toward the pointer corner on hover (desktop only). */
+.tilt {
+  transform: perspective(900px) rotateX(0) rotateY(0) translateY(0);
+  transition:
+    transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.35s ease;
+  will-change: transform;
+}
+@media (hover: hover) {
+  .tilt:hover {
+    transform: perspective(900px) rotateX(5deg) rotateY(-6deg) translateY(-4px);
+    box-shadow: var(--shadow-3d-lg);
+  }
+}
+
+/* Inset "well" for inputs and empty states. */
+.well {
+  background: #fbfcfa;
+  box-shadow: var(--shadow-well);
+}
+
+/* Raised keyboard-key buttons: a solid bottom edge that presses down. */
+.btn-3d {
+  --edge: #000;
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.18),
+    0 4px 0 0 var(--edge),
+    0 8px 14px -6px rgb(11 15 12 / 0.4);
+  transform: translateY(0);
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    background-color 0.15s ease;
+}
+.btn-3d:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.18),
+    0 5px 0 0 var(--edge),
+    0 10px 16px -6px rgb(11 15 12 / 0.4);
+}
+.btn-3d:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.18),
+    0 1px 0 0 var(--edge),
+    0 2px 4px -2px rgb(11 15 12 / 0.3);
+}
+.btn-edge-ink {
+  --edge: #000;
+}
+.btn-edge-in {
+  --edge: #0b5227;
+}
+.btn-edge-out {
+  --edge: #8f1717;
+}
+.btn-edge-ghost {
+  --edge: var(--color-ink);
+}
+.btn-edge-danger {
+  --edge: var(--color-out);
+}
+
+/* Small raised tile for icons / step numbers. */
+.icon-tile {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 0.8rem;
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.7),
+    inset 0 -3px 0 0 rgb(11 15 12 / 0.12),
+    0 4px 10px -4px rgb(11 15 12 / 0.25);
+}
+
+/* Soft dotted backdrop for hero / auth pages. */
+.bg-dots {
+  background-color: var(--color-surface);
+  background-image: radial-gradient(rgb(11 15 12 / 0.09) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@layer components {
+.pop-in {
+  animation: pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+}
+
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+@layer components {
+.float {
+  animation: float-y 4.5s ease-in-out infinite;
+}
+.float-delay {
+  animation-delay: -2.2s;
+}
+}
+
+@layer components {
+/* ---------- Isometric godown scene (components/IsoGodown.tsx) ---------- */
+
+.iso-scene {
+  --u: clamp(14px, 4.1vw, 25px);
+  position: relative;
+  height: calc(var(--u) * 15);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.iso-plane {
+  position: relative;
+  width: calc(var(--u) * 12);
+  height: calc(var(--u) * 12);
+  transform: translateY(calc(var(--u) * 1.5)) rotateX(58deg) rotateZ(-45deg);
+  transform-style: preserve-3d;
+}
+
+/* A box sits on the floor plane: --x/--y position, --w/--d footprint, --h height, --z lift (grid units). */
+.iso-box {
+  position: absolute;
+  left: calc(var(--x) * var(--u));
+  top: calc(var(--y) * var(--u));
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--d) * var(--u));
+  transform: translateZ(calc(var(--z, 0) * var(--u)));
+  transform-style: preserve-3d;
+  --top: #e8c48f;
+  --front: #c99a5b;
+  --side: #b2834a;
+}
+.iso-face {
+  position: absolute;
+  backface-visibility: hidden;
+}
+.iso-top {
+  inset: 0;
+  transform: translateZ(calc(var(--h) * var(--u)));
+  background: var(--top);
+}
+.iso-front {
+  left: 0;
+  width: 100%;
+  height: calc(var(--h) * var(--u));
+  top: calc((var(--d) - var(--h)) * var(--u));
+  transform-origin: bottom;
+  transform: rotateX(-90deg);
+  background: var(--front);
+  backface-visibility: visible;
+}
+.iso-left {
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: calc(var(--h) * var(--u));
+  transform-origin: left;
+  transform: rotateY(-90deg);
+  background: var(--side);
+  backface-visibility: visible;
+}
+
+.iso-floor {
+  --top: #dfe8df;
+  --front: #b9c7ba;
+  --side: #a8b8a9;
+}
+.iso-floor > .iso-top {
+  background-color: var(--top);
+  background-image:
+    linear-gradient(rgb(11 15 12 / 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(11 15 12 / 0.07) 1px, transparent 1px);
+  background-size: var(--u) var(--u);
+}
+.iso-wall {
+  --top: #f4efe4;
+  --front: #e6dfcf;
+  --side: #d6cdb9;
+}
+.iso-roof {
+  --top: #1f3a28;
+  --front: #16301f;
+  --side: #10241a;
+}
+.iso-crate > .iso-top {
+  background-image: linear-gradient(90deg, transparent 44%, rgb(255 255 255 / 0.45) 44% 56%, transparent 56%);
+}
+.iso-crate > .iso-front,
+.iso-crate > .iso-left {
+  background-image: linear-gradient(transparent 40%, rgb(0 0 0 / 0.06) 40% 60%, transparent 60%);
+}
+.iso-in {
+  --top: #4ade80;
+  --front: #16a34a;
+  --side: #15803d;
+}
+.iso-out {
+  --top: #f87171;
+  --front: #dc2626;
+  --side: #b91c1c;
+}
+.iso-low {
+  --top: #fbbf24;
+  --front: #d97706;
+  --side: #b45309;
+}
+.iso-door {
+  position: absolute;
+  inset: 28% 30% 0 30%;
+  border-radius: 3px 3px 0 0;
+  background: repeating-linear-gradient(180deg, #9aa79b 0 3px, #7f8c80 3px 6px);
+}
+.iso-sign {
+  position: absolute;
+  inset: 6% 8% auto 8%;
+  text-align: center;
+  font-weight: 700;
+  font-size: calc(var(--u) * 0.5);
+  letter-spacing: 0.08em;
+  color: #1f3a28;
+}
+
+}
+
+@keyframes iso-slide-in {
+  0% {
+    translate: calc(var(--u) * -5) 0;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    translate: 0 0;
+    opacity: 1;
+  }
+}
+@keyframes iso-slide-out {
+  0%,
+  35% {
+    translate: 0 0;
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    translate: 0 calc(var(--u) * 5);
+    opacity: 0;
+  }
+}
+@keyframes iso-bob {
+  0%,
+  100% {
+    translate: 0 0 0;
+  }
+  50% {
+    translate: 0 0 calc(var(--u) * 0.35);
+  }
+}
+@layer components {
+.iso-anim-in {
+  animation: iso-slide-in 4.8s cubic-bezier(0.3, 0.7, 0.2, 1) infinite;
+}
+.iso-anim-out {
+  animation: iso-slide-out 4.8s cubic-bezier(0.5, 0, 0.7, 0.4) infinite;
+}
+.iso-anim-bob {
+  animation: iso-bob 3.6s ease-in-out infinite;
+}
+}
+
+/* ---------- Workspace chrome (components/Workspace.tsx) ---------- */
+
+@layer components {
+  /* Raised table card: sticky header, zebra rows, scrolls sideways inside itself. */
+  .table-3d {
+    background: var(--color-paper);
+    border: 1.5px solid rgb(11 15 12 / 0.14);
+    border-radius: 1.1rem;
+    box-shadow: var(--shadow-3d);
+    overflow: auto;
+    max-height: 70vh;
+  }
+  .table-3d thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: linear-gradient(#f7f9f5, #eef1ee);
+    box-shadow: inset 0 -1.5px 0 rgb(11 15 12 / 0.12);
+  }
+  .table-3d tbody tr:nth-child(even) {
+    background: rgb(11 15 12 / 0.025);
+  }
+  .table-3d tbody tr:hover {
+    background: rgb(22 163 74 / 0.06);
+  }
+  .table-3d tfoot td {
+    background: #f7f9f5;
+  }
+  .table-3d-low {
+    border-color: rgb(180 83 9 / 0.45);
+  }
+  .table-3d-low thead th {
+    background: linear-gradient(#fff8eb, #fdf0d8);
+  }
+
+  /* Sidebar / sheet nav entry; the active one is raised like a key. */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    border-radius: 0.85rem;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgb(11 15 12 / 0.72);
+    text-align: left;
+    transition:
+      background-color 0.15s ease,
+      box-shadow 0.15s ease,
+      transform 0.15s ease;
+  }
+  .nav-item:hover {
+    background: rgb(255 255 255 / 0.7);
+    color: var(--color-ink);
+  }
+  .nav-item[aria-current="page"] {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.9),
+      0 2px 0 0 rgb(11 15 12 / 0.14),
+      0 8px 16px -8px rgb(11 15 12 / 0.3);
+    transform: translateY(-1px);
+  }
+  .nav-item:focus-visible,
+  .tabbar-item:focus-visible {
+    outline: 3px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+
+  /* Mobile bottom tab bar. */
+  .tabbar {
+    background: rgb(255 255 255 / 0.94);
+    backdrop-filter: blur(8px);
+    box-shadow:
+      0 -1px 0 rgb(11 15 12 / 0.1),
+      0 -10px 24px -14px rgb(11 15 12 / 0.35);
+  }
+  .tabbar-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    border-radius: 0.8rem;
+    padding: 0.3rem 0.1rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: rgb(11 15 12 / 0.62);
+  }
+  .tabbar-item[aria-current="page"] {
+    color: var(--color-ink);
+  }
+  .tabbar-item[aria-current="page"] .tabbar-icon {
+    background: var(--color-brand);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      0 3px 0 0 #0b5227,
+      0 6px 12px -6px rgb(11 15 12 / 0.45);
+    transform: translateY(-2px);
+  }
+  .tabbar-icon {
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    height: 1.75rem;
+    border-radius: 0.7rem;
+    font-size: 1rem;
+    transition:
+      transform 0.15s ease,
+      background-color 0.15s ease;
+  }
+
+  /* Raised toast. */
+  .toast-3d {
+    background: var(--color-paper);
+    border-radius: 1rem;
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.9),
+      0 4px 0 0 var(--toast-edge, var(--color-in)),
+      0 18px 30px -12px rgb(11 15 12 / 0.4);
+  }
+
+  /* Tiny isometric crate accent for godown cards. */
+  .crate-accent {
+    position: relative;
+    width: 2.6rem;
+    height: 2.6rem;
+    flex-shrink: 0;
+  }
+}
+
+/* ---------- Motion & print ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt,
+  .tilt:hover,
+  .btn-3d,
+  .btn-3d:hover,
+  .btn-3d:active {
+    transition: none !important;
+    transform: none !important;
+  }
+  .nav-item,
+  .nav-item[aria-current="page"],
+  .tabbar-icon,
+  .tabbar-item[aria-current="page"] .tabbar-icon {
+    transition: none !important;
+    transform: none !important;
+  }
+  .float,
+  .pop-in,
+  .iso-anim-in,
+  .iso-anim-out,
+  .iso-anim-bob {
+    animation: none !important;
+  }
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  body {
+    background: #fff;
+  }
+  .card-3d,
+  .card-3d-dark,
+  .tilt,
+  .btn-3d,
+  .well,
+  .icon-tile {
+    box-shadow: none !important;
+    transform: none !important;
+  }
+  .card-3d-dark {
+    background: #fff;
+    color: #000;
+  }
+  .table-3d {
+    box-shadow: none !important;
+    border: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .table-3d thead th {
+    position: static;
+    background: #fff;
+    box-shadow: inset 0 -1px 0 #000;
+  }
+  .table-3d tbody tr:nth-child(even) {
+    background: transparent;
+  }
+}

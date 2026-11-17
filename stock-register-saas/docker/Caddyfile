@@ -1,0 +1,19 @@
+# Caddy terminates HTTPS (automatic Let's Encrypt certificate) and proxies to the app.
+# DOMAIN comes from docker-compose.yml (default godownbook.ajmalaji.tech).
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Country-based (PPP) pricing trusts a country header. Strip any copy a visitor sends,
+	# so nobody can claim a cheaper country. (If you put Cloudflare in front, see DEPLOY.md.)
+	request_header -X-Vercel-IPCountry
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+		-Server
+	}
+
+	reverse_proxy app:3000
+}

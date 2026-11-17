@@ -1,0 +1,47 @@
+# GodownBook on a server that ALREADY runs Traefik on ports 80/443 (e.g. Hostinger's Docker VPS image).
+# Traefik routes https://godownbook.ajmalaji.tech to this container and gets the Let's Encrypt
+# certificate itself (resolver "letsencrypt", entrypoint "websecure"). No Caddy here.
+#
+#   docker compose -f docker-compose.traefik.yml up -d --build
+services:
+  app:
+    build: .
+    image: godownbook:latest
+    container_name: godownbook-app
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: file:/data/godownbook.db
+    volumes:
+      - db-data:/data
+    expose:
+      - "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.godownbook.rule=Host(`${DOMAIN:-godownbook.ajmalaji.tech}`)
+      - traefik.http.routers.godownbook.entrypoints=websecure
+      - traefik.http.routers.godownbook.tls.certresolver=letsencrypt
+      - traefik.http.routers.godownbook.middlewares=godownbook-headers
+      - traefik.http.routers.godownbook.service=godownbook
+      - traefik.http.services.godownbook.loadbalancer.server.port=3000
+      # Second address: the VPS's Hostinger hostname (wildcard DNS already points here). It has its own
+      # certificate and redirects to the main domain.
+      - traefik.http.routers.godownbook-alt.rule=Host(`${ALT_DOMAIN:-godownbook.srv2080380.hstgr.cloud}`)
+      - traefik.http.routers.godownbook-alt.entrypoints=websecure
+      - traefik.http.routers.godownbook-alt.tls.certresolver=letsencrypt
+      - traefik.http.routers.godownbook-alt.middlewares=godownbook-to-main
+      # Old address -> permanent redirect to the main domain (keeps old links working).
+      - traefik.http.middlewares.godownbook-to-main.redirectregex.regex=^https?://[^/]+/(.*)
+      - traefik.http.middlewares.godownbook-to-main.redirectregex.replacement=https://${DOMAIN:-godownbook.ajmalaji.tech}/$${1}
+      - traefik.http.middlewares.godownbook-to-main.redirectregex.permanent=true
+      - traefik.http.routers.godownbook-alt.service=godownbook
+      # Remove any country header a visitor sends, so nobody can fake a cheaper PPP price.
+      - traefik.http.middlewares.godownbook-headers.headers.customrequestheaders.X-Vercel-IPCountry=
+      - traefik.http.middlewares.godownbook-headers.headers.stsSeconds=31536000
+      - traefik.http.middlewares.godownbook-headers.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.godownbook-headers.headers.referrerPolicy=strict-origin-when-cross-origin
+      - traefik.http.middlewares.godownbook-headers.headers.customFrameOptionsValue=SAMEORIGIN
+
+volumes:
+  db-data: # the SQLite database — back this up
