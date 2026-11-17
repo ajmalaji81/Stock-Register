@@ -299,3 +299,31 @@ tests/               node:test unit tests (engine, gst, money/party, import, per
 ```
 
 The `agents/`, `skills/` and `.claude/commands/` folders came from the FastAPI template this project started from. They don't apply to this codebase.
+
+---
+
+## Demo account (mobile retailer)
+
+`scripts/seed-demo.mjs` builds a complete demo shop through the public API, so stock, GST and balances follow the same rules as real use:
+
+- **Business:** "Smart Mobiles (Demo)", Tamil Nadu.
+- **Godowns:** 5 (Main Showroom, Anna Nagar Branch, Velachery Branch, Central Warehouse, Service Centre).
+- **Items:** 30 phones and accessories with HSN and GST.
+- **Parties:** 9, including Karnataka and Kerala parties so IGST is used.
+- **Bills and documents:** purchases, sales, a return, quotations, an order, a challan and a purchase order.
+- **Money:** payments and expenses.
+- **Other:** a stock adjustment and 2 staff logins.
+
+```bash
+node scripts/seed-demo.mjs <baseUrl> demo@godownbook.in 12345678   # build the demo shop
+node scripts/make-pro.cjs demo@godownbook.in                        # unlock Lifetime Pro (local DB)
+node scripts/delete-account.cjs demo@godownbook.in                  # wipe it to start over
+```
+
+| Login | Password | Role |
+|---|---|---|
+| `demo@godownbook.in` | `12345678` | Owner, Lifetime Pro (everything) |
+| `demo+admin@godownbook.in` | `12345678` | Store admin (all godowns) |
+| `demo+sales@godownbook.in` | `12345678` | Sales operator (Main Showroom only, no purchase prices) |
+
+On the Docker server, run the two `.cjs` helpers inside the container: `docker cp scripts/make-pro.cjs godownbook-app:/app/` and then `docker exec -w /app godownbook-app node make-pro.cjs demo@godownbook.in`.
