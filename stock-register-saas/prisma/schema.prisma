@@ -19,6 +19,7 @@ model User {
   proSince     DateTime?
   trialEndsAt  DateTime? // Pro features free until this moment
   avatar       String? // profile picture as a small data: URL (256x256 JPEG, resized in the browser)
+  passwordChangedAt DateTime? // sessions issued before this are rejected (password reset)
   createdAt    DateTime  @default(now())
 
   // Business profile (printed on invoices; state decides CGST+SGST vs IGST)
@@ -186,16 +187,23 @@ model Voucher {
   roundOff      Float    @default(0)
   total         Float    @default(0)
   costTotal     Float    @default(0) // purchase cost of lines, for profit
+  paidAtBilling Float    @default(0) // sum of VoucherPayment rows (split payment at the counter)
   notes         String   @default("")
   sourceId      String? // converted from this voucher (quotation / order / challan)
   createdBy     String   @default("") // actor name
+  createdById   String   @default("") // User.id or StaffMember.id
   createdAt     DateTime @default(now())
+  updatedBy     String   @default("") // name of whoever last edited (owner only can edit)
+  updatedById   String   @default("")
+  updatedAt     DateTime? // null = never edited
+  editCount     Int      @default(0)
 
   user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   party    Party?         @relation(fields: [partyId], references: [id], onDelete: Restrict)
   godown   Godown         @relation(fields: [godownId], references: [id], onDelete: Restrict)
   lines    VoucherLine[]
   payments PartyPayment[]
+  splits   VoucherPayment[]
 
   @@unique([userId, kind, number])
   @@index([userId, kind, date])
@@ -209,6 +217,7 @@ model VoucherLine {
   qty         Float
   rate        Float // price per unit before tax
   discountPct Float  @default(0)
+  discountAmt Float  @default(0) // ₹ discount on the line (before tax); 0 = use discountPct
   taxRate     Float  @default(0)
   taxable     Float  @default(0)
   tax         Float  @default(0)
@@ -266,6 +275,7 @@ model StaffMember {
   passwordHash String
   role         String // SALES | SALES_PURCHASE | STORE_ADMIN
   avatar       String? // profile picture (data: URL)
+  passwordChangedAt DateTime? // sessions issued before this are rejected
   godownIds    String   @default("[]") // JSON array of godown ids; [] = all godowns
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -285,4 +295,37 @@ model ActivityLog {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+// One-time password reset links (only a SHA-256 hash of the token is stored).
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  kind      String // "owner" | "staff"
+  subjectId String // User.id or StaffMember.id
+  email     String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([subjectId, createdAt])
+}
+
+// How a bill was paid at the counter. One row per mode (split payment), e.g. CARD 5000 + UPI 4000 + CASH 1000.
+// FINANCE rows carry the financier (Bajaj, HDFC...), disbursement amount (= amount), loan/payment info and scheme.
+// For bills with a party, each row is ALSO mirrored as a PartyPayment (voucherId set) so party balances stay right.
+model VoucherPayment {
+  id          String   @id @default(cuid())
+  voucherId   String
+  mode        String // CASH | CARD | UPI | BANK | CHEQUE | FINANCE
+  amount      Float // for FINANCE: the disbursement amount
+  reference   String   @default("") // card last 4 / UPI ref / cheque no.
+  financier   String   @default("") // FINANCE only, required
+  paymentInfo String   @default("") // FINANCE only, required: loan / agreement / DO number
+  scheme      String   @default("") // FINANCE only, required: e.g. "6/0 EMI, 0 down payment"
+  createdAt   DateTime @default(now())
+
+  voucher Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([voucherId])
 }

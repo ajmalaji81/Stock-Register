@@ -156,6 +156,18 @@ log(`${PARTIES.length} parties (suppliers + customers, incl. Karnataka & Kerala 
 const line = (sku, qty, rate, discountPct = 0) => ({ itemId: I[sku].id, qty, rate: rate ?? I[sku].purchasePrice, discountPct, taxRate: I[sku].gstRate, description: "" });
 const sale = (sku, qty, discountPct = 0) => ({ itemId: I[sku].id, qty, rate: Math.round(I[sku].salePrice / 1.18), discountPct, taxRate: I[sku].gstRate, description: "" });
 const V = (body) => O("POST", "/api/vouchers", { gstEnabled: true, placeOfSupply: "", notes: "", paidNow: 0, paymentMode: "CASH", ...body });
+// Bill total exactly as the server will compute it (intra-state GST, rounded to the rupee), for walk-in split payments.
+const billTotal = (lines) => {
+  let taxable = 0;
+  let tax = 0;
+  for (const l of lines) {
+    const t = Math.round(l.qty * l.rate * (1 - (l.discountPct || 0) / 100) * 100) / 100;
+    taxable += t;
+    tax += Math.round(t * l.taxRate) / 100;
+  }
+  return Math.round(Math.round((taxable + tax) * 100) / 100);
+};
+const pay = (mode, amount, extra = {}) => ({ mode, amount, reference: "", financier: "", paymentInfo: "", scheme: "", ...extra });
 
 // Purchases (stock IN)
 await V({ kind: "PURCHASE", date: day(-8), partyId: P["Sri Balaji Mobile Distributors"], godownId: G["Main Showroom"], lines: [line("SAM-A55-128", 5), line("SAM-M35-128", 8), line("MI-RN13P-256", 6)], notes: "Bill SBD/2231", paidNow: 100000, paymentMode: "BANK" });
@@ -164,17 +176,30 @@ await V({ kind: "PURCHASE", date: day(-6), partyId: P["Accessory Hub Traders"], 
 log("3 purchase bills");
 
 // Sales (stock OUT) — walk-in cash sales, retail customers, B2B, inter-state B2B
-await V({ kind: "SALE", date: day(-5), partyId: null, godownId: G["Main Showroom"], lines: [sale("SAM-M35-128", 1), sale("ACC-TG-ASSORT", 1), sale("ACC-CASE-SIL", 1)], notes: "Walk-in" });
-await V({ kind: "SALE", date: day(-5), partyId: P["Karthik Raman"], godownId: G["Main Showroom"], lines: [sale("APL-IP15-128", 1), sale("ACC-APL-20W", 1), sale("ACC-CBL-LC1", 1)], paidNow: 75000, paymentMode: "UPI" });
+{
+  const lines = [sale("SAM-M35-128", 1), sale("ACC-TG-ASSORT", 1), sale("ACC-CASE-SIL", 1)];
+  const total = billTotal(lines);
+  await V({ kind: "SALE", date: day(-5), partyId: null, godownId: G["Main Showroom"], lines, notes: "Walk-in",
+    payments: [pay("CARD", 10000, { reference: "HDFC card xx4421" }), pay("UPI", 8000, { reference: "UPI 6612" }), pay("CASH", total - 18000)] });
+}
+await V({ kind: "SALE", date: day(-5), partyId: P["Karthik Raman"], godownId: G["Main Showroom"], lines: [sale("APL-IP15-128", 1), sale("ACC-APL-20W", 1), sale("ACC-CBL-LC1", 1)],
+  payments: [pay("UPI", 50000, { reference: "UPI 9021" }), pay("CARD", 25000, { reference: "ICICI card xx1180" })] });
 await V({ kind: "SALE", date: day(-4), partyId: P["Priya Shankar"], godownId: G["Anna Nagar Branch"], lines: [sale("SAM-A55-128", 1, 5), sale("ACC-CASE-FLIP", 1), sale("ACC-TG-ASSORT", 1)], paidNow: 20000, paymentMode: "CASH" });
 await V({ kind: "SALE", date: day(-4), partyId: P["Metro Cellular Point"], godownId: G["Main Showroom"], lines: [sale("MI-R13C-128", 6, 4), sale("NOK-105", 10, 5), sale("ACC-EAR-35", 20, 10)], notes: "B2B dealer order" });
 await V({ kind: "SALE", date: day(-3), partyId: P["Kerala Mobile World"], godownId: G["Central Warehouse"], lines: [sale("VIVO-Y28-128", 5, 3), sale("RLM-N70P-128", 4, 3), sale("ACC-MI-PB10K", 6)], notes: "Inter-state B2B (IGST)" });
-await V({ kind: "SALE", date: day(-2), partyId: null, godownId: G["Velachery Branch"], lines: [sale("OP-CE4-128", 1), sale("ACC-BOAT-33W", 1)], paidNow: 0 });
-await V({ kind: "SALE", date: day(-1), partyId: P["Arun Prakash"], godownId: G["Anna Nagar Branch"], lines: [sale("SAM-S24-256", 1, 2), sale("ACC-SAM-BFE", 1)], paidNow: 50000, paymentMode: "BANK" });
+{
+  const lines = [sale("OP-CE4-128", 1), sale("ACC-BOAT-33W", 1)];
+  await V({ kind: "SALE", date: day(-2), partyId: null, godownId: G["Velachery Branch"], lines, payments: [pay("UPI", billTotal(lines), { reference: "UPI 3307" })] });
+}
+await V({ kind: "SALE", date: day(-1), partyId: P["Arun Prakash"], godownId: G["Anna Nagar Branch"], lines: [sale("SAM-S24-256", 1, 2), sale("ACC-SAM-BFE", 1)],
+  payments: [
+    pay("FINANCE", 60000, { financier: "Bajaj Finserv", paymentInfo: "DO-4471209", scheme: "10 EMI × ₹6,000, 0% interest, ₹20,000 down" }),
+    pay("CASH", 20000),
+  ] });
 await V({ kind: "SALE", date: day(0), partyId: null, godownId: G["Main Showroom"], lines: [sale("JIO-BHV2", 2), sale("ACC-SD-128", 1), sale("ACC-TG-ASSORT", 3)] });
 await V({ kind: "SALE", date: day(0), partyId: P["TechFix Corporate Services"], godownId: G["Main Showroom"], lines: [sale("SAM-M35-128", 4, 6), sale("ACC-SAM-25W", 4)], notes: "Corporate order — 4 staff phones" });
 await V({ kind: "SALE", date: day(0), partyId: null, godownId: G["Service Centre"], lines: [sale("SRV-DISP-GEN", 1)], notes: "Screen replacement job #S-104" });
-log("10 sales bills (cash, retail, B2B, inter-state)");
+log("10 sales bills (cash, split card/UPI/cash, finance, B2B, inter-state)");
 
 // Sale return
 await V({ kind: "SALE_RETURN", date: day(-1), partyId: P["Metro Cellular Point"], godownId: G["Main Showroom"], lines: [sale("ACC-EAR-35", 4, 10)], notes: "Defective earphones returned" });

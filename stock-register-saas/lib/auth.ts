@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { sessionIsStale } from "./password-reset";
 
 const COOKIE = "sr_session";
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
@@ -9,6 +10,8 @@ export type SessionKind = "owner" | "staff";
 export interface Session {
   kind: SessionKind;
   id: string; // User.id for owners, StaffMember.id for staff
+  /** When the session was issued (seconds). Sessions older than a password change are rejected. */
+  iat?: number;
 }
 
 function secret(): Uint8Array {
@@ -43,7 +46,7 @@ export async function readSession(): Promise<Session | null> {
   try {
     const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
     if (!payload.sub) return null;
-    return { id: payload.sub, kind: payload.kind === "staff" ? "staff" : "owner" };
+    return { id: payload.sub, kind: payload.kind === "staff" ? "staff" : "owner", iat: payload.iat };
   } catch {
     return null;
   }
@@ -57,7 +60,10 @@ export async function currentUser() {
   const s = await readSession();
   if (!s) return null;
   const { prisma } = await import("./db");
-  if (s.kind === "owner") return prisma.user.findUnique({ where: { id: s.id } });
+  if (s.kind === "owner") {
+    const owner = await prisma.user.findUnique({ where: { id: s.id } });
+    return owner && !sessionIsStale(s.iat, owner.passwordChangedAt) ? owner : null;
+  }
   const staff = await prisma.staffMember.findUnique({ where: { id: s.id }, include: { user: true } });
-  return staff?.active ? staff.user : null;
+  return staff?.active && !sessionIsStale(s.iat, staff.passwordChangedAt) ? staff.user : null;
 }

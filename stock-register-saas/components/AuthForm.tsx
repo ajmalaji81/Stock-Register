@@ -54,6 +54,13 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
           autoComplete={signup ? "new-password" : "current-password"}
         />
       </Field>
+      {!signup && (
+        <p className="-mt-2 text-right text-sm">
+          <Link href="/forgot-password" className="font-semibold underline">
+            Forgot password?
+          </Link>
+        </p>
+      )}
       {error && (
         <p role="alert" className="rounded-lg border-2 border-out bg-out/10 px-3 py-2 text-sm font-medium text-out">
           {error}

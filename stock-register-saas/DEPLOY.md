@@ -148,6 +148,23 @@ For the price to actually change at checkout, the Dodo product must be **Pay Wha
 
 ---
 
+## 8. Password reset emails (Gmail)
+
+The **Forgot password?** link on the login page emails a one-time reset link. The link expires after 30 minutes. Gmail sends it through SMTP.
+
+1. Turn on **2-Step Verification** for the Gmail account: https://myaccount.google.com/security
+2. Create an **App Password** at https://myaccount.google.com/apppasswords and name it "GodownBook". Your normal Gmail password won't work.
+3. Add these to `.env.production`:
+   ```env
+   SMTP_USER="yourname@gmail.com"
+   SMTP_PASS="abcd efgh ijkl mnop"      # the 16-character App Password
+   MAIL_FROM="GodownBook <yourname@gmail.com>"
+   ```
+4. Restart: `docker compose -f docker-compose.traefik.yml up -d` (or `docker compose up -d`).
+5. Test it: use **Forgot password?** with your own email. If nothing arrives, check `docker compose logs app` for "Password reset email failed" and check your spam folder.
+
+`NEXT_PUBLIC_APP_URL` must be your public https address, because the reset link is built from it. Gmail allows about 500 emails a day from a personal account.
+
 ## Troubleshooting
 
 - **Caddy can't get a certificate.** DNS doesn't point at this server yet, ports 80/443 are closed, or Cloudflare's proxy is on. Check `docker compose logs caddy`.

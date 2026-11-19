@@ -154,15 +154,21 @@ export async function listParties(
   assertCanViewParties(actor);
   const typeFilter =
     q.type === "CUSTOMER" ? { in: ["CUSTOMER", "BOTH"] } : q.type === "SUPPLIER" ? { in: ["SUPPLIER", "BOTH"] } : q.type === "BOTH" ? { in: ["BOTH"] } : undefined;
-  const parties = await prisma.party.findMany({
-    where: {
-      userId: actor.accountId,
-      type: typeFilter,
-      ...(q.q ? { OR: [{ name: { contains: q.q } }, { phone: { contains: q.q } }, { gstin: { contains: q.q.toUpperCase() } }] } : {}),
-    },
-    orderBy: { name: "asc" },
-    take: 2000,
-  });
+  // A phone-like query ("98401 00001", "+91 9840100001") is matched on digits only, so it finds
+  // numbers however they were saved (spaces, dashes, +91 prefix).
+  const digits = (s: string) => s.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
+  const phoneQuery = q.q && /^[+\d\s()-]+$/.test(q.q) && digits(q.q).length >= 4 ? digits(q.q) : null;
+  const parties = (
+    await prisma.party.findMany({
+      where: {
+        userId: actor.accountId,
+        type: typeFilter,
+        ...(q.q && !phoneQuery ? { OR: [{ name: { contains: q.q } }, { phone: { contains: q.q } }, { gstin: { contains: q.q.toUpperCase() } }] } : {}),
+      },
+      orderBy: { name: "asc" },
+      take: phoneQuery ? 5000 : 2000,
+    })
+  ).filter((p) => !phoneQuery || digits(p.phone).includes(phoneQuery));
   const parts = await balanceParts(actor.accountId, parties);
   const rows = parties.map((p) => toRow(p, parts.get(p.id) ?? emptyParts(p.openingBalance)));
   if (q.sort === "balance_desc") rows.sort((a, b) => b.balance - a.balance);
@@ -328,7 +334,7 @@ export async function partyLedger(
         date: x.date,
         createdAt: x.createdAt.toISOString(),
         kind: x.direction === "IN" ? "PAYMENT_IN" : "PAYMENT_OUT",
-        ref: `${x.direction === "IN" ? "Payment received" : "Payment made"} (${x.mode}${x.reference ? ` · ${x.reference}` : ""})`,
+        ref: `${x.direction === "IN" ? "Payment received" : "Payment made"} (${MODE_NAME[x.mode] ?? x.mode}${x.reference ? ` · ${x.reference}` : ""})`,
         amount: x.amount,
         notes: x.notes,
       }),
@@ -500,16 +506,30 @@ export async function deleteExpense(actor: Actor, id: string): Promise<void> {
 
 export async function cashbook(actor: Actor, from?: string, to?: string): Promise<CashSummary> {
   if (!actor.can("reports.view") && !actor.can("payments.manage")) assertCan(actor, "reports.view");
-  const [payments, expenses] = await Promise.all([
+  const [payments, expenses, counter] = await Promise.all([
     prisma.partyPayment.findMany({
       where: { userId: actor.accountId, date: { lte: to || undefined } },
       select: { date: true, mode: true, amount: true, direction: true },
     }),
     prisma.expense.findMany({ where: { userId: actor.accountId, date: { lte: to || undefined } }, select: { date: true, mode: true, amount: true } }),
+    // Split payments taken at the counter on bills with no party (walk-in). Bills WITH a party are already
+    // mirrored into PartyPayment by the billing module, so they're excluded here to avoid double counting.
+    prisma.voucherPayment.findMany({
+      where: { voucher: { userId: actor.accountId, partyId: null, status: { not: "CANCELLED" }, date: { lte: to || undefined } } },
+      select: { mode: true, amount: true, voucher: { select: { date: true, kind: true } } },
+    }),
   ]);
   const flows: CashFlow[] = [
     ...payments.map((p) => ({ date: p.date, mode: p.mode, amount: p.direction === "IN" ? p.amount : -p.amount })),
     ...expenses.map((e) => ({ date: e.date, mode: e.mode, amount: -e.amount })),
+    ...counter.map((c) => ({ date: c.voucher.date, mode: c.mode, amount: counterSign(c.voucher.kind) * c.amount })),
   ];
   return summarizeCash(flows, from, to);
+}
+
+const MODE_NAME: Record<string, string> = { CASH: "Cash", CARD: "Card", UPI: "UPI", BANK: "Bank", CHEQUE: "Cheque", FINANCE: "Finance" };
+
+/** Money direction of a counter payment on a bill: in for sales / purchase returns, out for purchases / sales returns. */
+function counterSign(kind: string): number {
+  return kind === "PURCHASE" || kind === "SALE_RETURN" ? -1 : 1;
 }

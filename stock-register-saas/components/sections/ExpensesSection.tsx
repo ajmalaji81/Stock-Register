@@ -258,7 +258,7 @@ function CashBook({ version }: { version: number }) {
               data &&
               downloadCsv(
                 `cash-book-${todayISO()}.csv`,
-                toCsv([["Date", "Cash in", "Cash out", "Bank in", "Bank out"], ...data.days.map((d) => [d.date, d.cashIn, d.cashOut, d.bankIn, d.bankOut])]),
+                toCsv([["Date", "Cash in", "Cash out", "Bank/card/UPI/finance in", "Bank/card/UPI/finance out"], ...data.days.map((d) => [d.date, d.cashIn, d.cashOut, d.bankIn, d.bankOut])]),
               )
             }
           >
@@ -277,9 +277,9 @@ function CashBook({ version }: { version: number }) {
         <>
           <div className="grid grid-cols-2 gap-3">
             <Stat label="Cash in hand" tone={data.closingCash < 0 ? "out" : "in"} value={money(data.closingCash)} sub={`Opening ${money(data.openingCash)}`} />
-            <Stat label="Bank / UPI" tone={data.closingBank < 0 ? "out" : "in"} value={money(data.closingBank)} sub={`Opening ${money(data.openingBank)}`} />
+            <Stat label="Bank / card / UPI / finance" tone={data.closingBank < 0 ? "out" : "in"} value={money(data.closingBank)} sub={`Opening ${money(data.openingBank)}`} />
           </div>
-          <p className="text-xs text-ink/60">From payments received and made (Cash vs Bank / UPI / Cheque) minus expenses. Bills not yet paid don&apos;t count until a payment is recorded.</p>
+          <p className="text-xs text-ink/60">From payments received and made, including split payments taken on bills (Cash vs Bank / card / UPI / cheque / finance), minus expenses. Bills not yet paid don&apos;t count until a payment is recorded.</p>
           {data.days.length === 0 ? (
             <Empty>No money movement in this period.</Empty>
           ) : (
@@ -290,8 +290,8 @@ function CashBook({ version }: { version: number }) {
                     <th className="px-3 py-2">Date</th>
                     <th className="px-3 py-2 text-right text-in">Cash in</th>
                     <th className="px-3 py-2 text-right text-out">Cash out</th>
-                    <th className="px-3 py-2 text-right text-in">Bank in</th>
-                    <th className="px-3 py-2 text-right text-out">Bank out</th>
+                    <th className="px-3 py-2 text-right text-in">Non-cash in</th>
+                    <th className="px-3 py-2 text-right text-out">Non-cash out</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink/10">

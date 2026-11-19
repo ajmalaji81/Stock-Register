@@ -2,6 +2,7 @@
 // EVERY server query on business data must use `actor.accountId` (the owner's User.id).
 import type { User } from "@prisma/client";
 import { readSession } from "./auth";
+import { sessionIsStale } from "./password-reset";
 import { prisma } from "./db";
 import { StockError } from "./engine";
 import { PERMISSIONS, roleCan, type Permission, type Role } from "./permissions";
@@ -34,20 +35,20 @@ function parseIds(json: string): string[] | null {
   }
 }
 
-/** The signed-in actor, or null. Inactive staff count as signed out. */
+/** The signed-in actor, or null. Inactive staff, and sessions from before a password reset, count as signed out. */
 export async function currentActor(): Promise<Actor | null> {
   const s = await readSession();
   if (!s) return null;
   if (s.kind === "owner") {
     const owner = await prisma.user.findUnique({ where: { id: s.id } });
-    if (!owner) return null;
+    if (!owner || sessionIsStale(s.iat, owner.passwordChangedAt)) return null;
     return {
       accountId: owner.id, owner, actorId: owner.id, name: owner.name, email: owner.email, avatar: owner.avatar,
       role: "OWNER", isOwner: true, godownIds: null, can: () => true,
     };
   }
   const staff = await prisma.staffMember.findUnique({ where: { id: s.id }, include: { user: true } });
-  if (!staff || !staff.active) return null;
+  if (!staff || !staff.active || sessionIsStale(s.iat, staff.passwordChangedAt)) return null;
   const role = staff.role as Role;
   return {
     accountId: staff.userId, owner: staff.user, actorId: staff.id, name: staff.name, email: staff.email, avatar: staff.avatar,

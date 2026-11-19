@@ -53,6 +53,7 @@ const ACTION_LABELS: Record<string, string> = {
   "voucher.create": "Bill / document created",
   "voucher.cancel": "Bill cancelled",
   "voucher.convert": "Document converted",
+  "voucher.edit": "Invoice edited (owner)",
   "party.create": "Party added",
   "party.update": "Party edited",
   "party.delete": "Party deleted",
@@ -63,6 +64,7 @@ const ACTION_LABELS: Record<string, string> = {
   "expense.delete": "Expense deleted",
   "settings.update": "Settings changed",
   "profile.update": "Profile picture changed",
+  "auth.password_reset": "Password reset by email",
 };
 
 export function actionLabel(action: string): string {

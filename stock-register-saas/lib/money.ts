@@ -3,9 +3,9 @@
 
 export type VoucherKindForBalance = "SALE" | "SALE_RETURN" | "PURCHASE" | "PURCHASE_RETURN";
 export type PaymentDirection = "IN" | "OUT";
-export type PaymentMode = "CASH" | "BANK" | "UPI" | "CHEQUE";
+export type PaymentMode = "CASH" | "CARD" | "UPI" | "BANK" | "CHEQUE" | "FINANCE";
 
-export const PAYMENT_MODES: PaymentMode[] = ["CASH", "BANK", "UPI", "CHEQUE"];
+export const PAYMENT_MODES: PaymentMode[] = ["CASH", "CARD", "UPI", "BANK", "CHEQUE", "FINANCE"];
 export const EXPENSE_CATEGORIES = ["Rent", "Salary", "Transport", "Electricity", "Repairs", "Packaging", "Other"];
 
 export const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -133,7 +133,7 @@ export function whatsappLink(phone: string, text: string): string | null {
   return p ? `https://wa.me/${p}?text=${encodeURIComponent(text)}` : null;
 }
 
-/** Cash vs bank bucket for a payment / expense mode. */
+/** Cash vs bank bucket for a payment / expense mode. Only CASH is cash; card, UPI, bank, cheque and finance are all non-cash. */
 export function bucketOf(mode: string): "cash" | "bank" {
   return mode === "CASH" ? "cash" : "bank";
 }
