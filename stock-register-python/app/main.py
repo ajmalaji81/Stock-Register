@@ -23,6 +23,16 @@ from .schemas import first_message
 log = logging.getLogger("godownbook")
 
 
+class RevalidatingStaticFiles(StaticFiles):
+    """Serve static files with `Cache-Control: no-cache`: browsers re-check (cheap, via ETag) before reusing a copy,
+    so a deploy is never hidden behind a stale cached app.css / script."""
+
+    async def get_response(self, path, scope):
+        res = await super().get_response(path, scope)
+        res.headers["Cache-Control"] = "no-cache"
+        return res
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     config.auth_secret()  # fail fast when AUTH_SECRET is missing or short
@@ -67,7 +77,7 @@ def create_app() -> FastAPI:
 
     from .web.pages import router as web_router, STATIC_DIR
 
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.mount("/static", RevalidatingStaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(web_router)
     return app
 
