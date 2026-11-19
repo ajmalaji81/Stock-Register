@@ -327,3 +327,14 @@ node scripts/delete-account.cjs demo@godownbook.in                  # wipe it to
 | `demo+sales@godownbook.in` | `12345678` | Sales operator (Main Showroom only, no purchase prices) |
 
 On the Docker server, run the two `.cjs` helpers inside the container: `docker cp scripts/make-pro.cjs godownbook-app:/app/` and then `docker exec -w /app godownbook-app node make-pro.cjs demo@godownbook.in`.
+
+---
+
+## Forgot password (email reset link)
+
+- **The link:** **Forgot password?** on the login page emails a reset link to owners and staff. The link expires after 30 minutes, works once, and only its SHA-256 hash is stored.
+- **After a reset:** every existing session for that person is signed out.
+- **Privacy and limits:** the response is the same whether or not the email has an account, and each account can get at most 3 links per hour.
+- **Setup:** set `SMTP_USER` and `SMTP_PASS` (a Gmail App Password) in `.env` or `.env.production`. Section 8 of `DEPLOY.md` has the steps.
+- **Without SMTP:** in development the link is printed in the server log.
+- **API:** `POST /api/auth/forgot` `{email}` · `GET /api/auth/reset?token=` (check) · `POST /api/auth/reset` `{token, password}`.

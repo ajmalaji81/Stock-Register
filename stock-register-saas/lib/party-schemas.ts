@@ -5,7 +5,7 @@ const text = (max: number) => z.string().trim().max(max).default("");
 const amount = z.coerce.number().positive("Amount must be more than 0").max(1e11);
 
 export const partyTypeSchema = z.enum(["CUSTOMER", "SUPPLIER", "BOTH"]);
-export const modeSchema = z.enum(["CASH", "BANK", "UPI", "CHEQUE"]);
+export const modeSchema = z.enum(["CASH", "CARD", "UPI", "BANK", "CHEQUE", "FINANCE"]);
 
 export const partySchema = z.object({
   name: z.string().trim().min(1, "Party name is required").max(120),

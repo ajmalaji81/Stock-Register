@@ -24,6 +24,8 @@ export interface PartyLite {
   phone: string;
   gstin: string;
   state: string;
+  /** + they owe us, − we owe them (when the Parties module provides it). */
+  balance: number | null;
 }
 
 function normaliseParties(data: unknown): PartyLite[] {
@@ -37,7 +39,7 @@ function normaliseParties(data: unknown): PartyLite[] {
   return arr
     .map((p) => p as Partial<PartyLite>)
     .filter((p): p is Partial<PartyLite> & { id: string; name: string } => typeof p.id === "string" && typeof p.name === "string")
-    .map((p) => ({ id: p.id, name: p.name, type: p.type ?? "CUSTOMER", phone: p.phone ?? "", gstin: p.gstin ?? "", state: p.state ?? "" }));
+    .map((p) => ({ id: p.id, name: p.name, type: p.type ?? "CUSTOMER", phone: p.phone ?? "", gstin: p.gstin ?? "", state: p.state ?? "", balance: typeof p.balance === "number" ? p.balance : null }));
 }
 
 /** Parties from the Parties module (GET /api/parties). Empty if unavailable. */

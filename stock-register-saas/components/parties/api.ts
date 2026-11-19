@@ -18,4 +18,4 @@ export function qs(params: Record<string, string | undefined>): string {
   return q ? `?${q}` : "";
 }
 
-export const MODE_LABEL: Record<string, string> = { CASH: "Cash", BANK: "Bank", UPI: "UPI", CHEQUE: "Cheque" };
+export const MODE_LABEL: Record<string, string> = { CASH: "Cash", CARD: "Card", UPI: "UPI", BANK: "Bank", CHEQUE: "Cheque", FINANCE: "Finance" };

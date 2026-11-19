@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CONVERSIONS, KIND_LABEL, stockEffect, type VoucherKind } from "@/lib/gst";
+import { CONVERSIONS, KIND_LABEL, PAYMENT_MODE_LABEL, paymentSummary, stockEffect, type VoucherKind } from "@/lib/gst";
 import type { VoucherDTO } from "@/lib/voucher-service";
 import type { SectionProps } from "../sections/types";
 import { Badge, Button, Empty, Input, Modal, SectionHeader, Select, Tabs, money, qty } from "../ui";
@@ -19,9 +19,8 @@ function statusText(v: VoucherDTO): string {
   if (v.status === "CANCELLED") return "Cancelled";
   if (v.status === "CONVERTED") return "Converted";
   if (v.kind === "SALE" || v.kind === "PURCHASE") {
-    if (!v.partyId) return "Cash";
-    const due = v.total - v.paid;
-    return due <= 0.005 ? "Paid" : v.paid > 0 ? "Part paid" : "Unpaid";
+    if (!v.partyId) return v.paidAtBilling > 0 ? "Paid" : "Cash";
+    return v.balanceDue <= 0.005 ? "Paid" : v.paid > 0 ? "Part paid" : "Unpaid";
   }
   return v.kind === "SALE_RETURN" || v.kind === "PURCHASE_RETURN" ? "Recorded" : "Open";
 }
@@ -37,7 +36,8 @@ export function whatsappLink(v: VoucherDTO, phone: string | undefined, businessN
     `${KIND_LABEL[v.kind]} ${v.number}${businessName ? ` from ${businessName}` : ""}`,
     `Date: ${v.date}`,
     `Amount: ${money(v.total)}`,
-    v.kind === "SALE" && v.partyId && v.total - v.paid > 0.005 ? `Balance due: ${money(v.total - v.paid)}` : "",
+    v.kind === "SALE" && v.payments.length > 0 ? `Paid: ${paymentSummary(v.payments)}` : "",
+    v.kind === "SALE" && v.balanceDue > 0.005 ? `Balance due: ${money(v.balanceDue)}` : "",
     url ? `View / download: ${url}` : "",
   ]
     .filter(Boolean)
@@ -48,6 +48,25 @@ export function whatsappLink(v: VoucherDTO, phone: string | undefined, businessN
 }
 
 /** A tabbed list of one family of vouchers (sales, purchases or documents) with create / view / actions. */
+const when = (iso: string): string => new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+
+/** "Created by … · when" and, if edited, "Edited by … · when (n edits)". */
+function AuditTrail({ v, compact = false }: { v: VoucherDTO; compact?: boolean }) {
+  return (
+    <div className={`space-y-0.5 text-xs ${compact ? "text-ink/55" : "text-ink/60"}`}>
+      <div>
+        <span aria-hidden>👤 </span>Created by <b className="font-semibold text-ink/80">{v.createdBy || "—"}</b> · {when(v.createdAt)}
+      </div>
+      {v.updatedAt && (
+        <div className="text-low">
+          <span aria-hidden>✎ </span>Edited by <b className="font-semibold">{v.updatedBy || "—"}</b> · {when(v.updatedAt)}
+          {v.editCount > 1 ? ` (${v.editCount} edits)` : ""}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function VoucherBook({ props, title, subtitle, tabs }: { props: SectionProps; title: string; subtitle: string; tabs: BookTab[] }) {
   const { ws, scope, version, refresh, notify, can } = props;
   const [kind, setKind] = useState<VoucherKind>(tabs[0].kind);
@@ -58,6 +77,9 @@ export default function VoucherBook({ props, title, subtitle, tabs }: { props: S
   const [to, setTo] = useState("");
   const [creating, setCreating] = useState(false);
   const [viewing, setViewing] = useState<VoucherDTO | null>(null);
+  const [editing, setEditing] = useState<VoucherDTO | null>(null);
+  /** Only the owner (super admin) may edit saved bills; the server enforces it too. */
+  const isOwner = ws.actor.isOwner;
   const [tick, setTick] = useState(0);
   const { parties, reload } = useParties(version);
   const [businessName, setBusinessName] = useState("");
@@ -89,7 +111,7 @@ export default function VoucherBook({ props, title, subtitle, tabs }: { props: S
   const shown = useMemo(() => (scope === "ALL" || !rows ? rows : rows.filter((r) => r.godownId === scope)), [rows, scope]);
   const live = (shown ?? []).filter((r) => r.status !== "CANCELLED");
   const sum = live.reduce((a, r) => a + r.total, 0);
-  const due = live.reduce((a, r) => a + (r.partyId && (r.kind === "SALE" || r.kind === "PURCHASE") ? Math.max(0, r.total - r.paid) : 0), 0);
+  const due = live.reduce((a, r) => a + r.balanceDue, 0);
   const profit = live.some((r) => r.profit !== null) ? live.reduce((a, r) => a + (r.profit ?? 0), 0) : null;
   const phoneOf = (v: VoucherDTO) => v.partyPhone || parties.find((p) => p.id === v.partyId)?.phone;
 
@@ -123,6 +145,16 @@ export default function VoucherBook({ props, title, subtitle, tabs }: { props: S
   async function open(v: VoucherDTO) {
     try {
       setViewing(await api<VoucherDTO>("GET", `/api/vouchers/${v.id}`));
+    } catch (e) {
+      notify((e as Error).message, true);
+    }
+  }
+
+  async function edit(v: VoucherDTO) {
+    try {
+      const full = v.lines ? v : await api<VoucherDTO>("GET", `/api/vouchers/${v.id}`);
+      setViewing(null);
+      setEditing(full);
     } catch (e) {
       notify((e as Error).message, true);
     }
@@ -180,16 +212,27 @@ export default function VoucherBook({ props, title, subtitle, tabs }: { props: S
                   <span className="text-xs text-ink/60">{v.date} · {v.godownName}</span>
                   <span className="text-lg font-bold tabular-nums">{money(v.total)}</span>
                 </div>
-                {(v.profit !== null || (v.partyId && (v.kind === "SALE" || v.kind === "PURCHASE") && v.total - v.paid > 0.005)) && (
+                {(v.profit !== null || v.balanceDue > 0.005) && (
                   <div className="mt-1 flex justify-between text-xs">
-                    <span className="text-low">{v.partyId && (v.kind === "SALE" || v.kind === "PURCHASE") && v.total - v.paid > 0.005 ? `Due ${money(v.total - v.paid)}` : ""}</span>
+                    <span className="text-low">{v.balanceDue > 0.005 ? `Due ${money(v.balanceDue)}` : ""}</span>
                     {v.profit !== null && <span className={v.profit >= 0 ? "text-in" : "text-out"}>Profit {money(v.profit)}</span>}
                   </div>
                 )}
+                {v.payments.length > 0 && <div className="mt-1 truncate text-xs font-medium text-ink/70" title={paymentSummary(v.payments)}>💳 {paymentSummary(v.payments)}</div>}
                 {v.sourceNumber && <div className="mt-1 text-xs text-ink/60">From {v.sourceNumber}</div>}
                 {v.convertedTo.length > 0 && <div className="mt-1 text-xs text-ink/60">→ {v.convertedTo.map((c) => c.number).join(", ")}</div>}
+                <div className="mt-2 border-t border-ink/10 pt-2">
+                  <AuditTrail v={v} compact />
+                </div>
               </button>
-              <Actions v={v} onPrint={() => window.open(`/print/voucher/${v.id}`, "_blank")} whatsapp={whatsappLink(v, phoneOf(v), businessName)} onConvert={convert} onCancel={cancel} />
+              <Actions
+                v={v}
+                onPrint={() => window.open(`/print/voucher/${v.id}`, "_blank")}
+                whatsapp={whatsappLink(v, phoneOf(v), businessName)}
+                onConvert={convert}
+                onCancel={cancel}
+                onEdit={isOwner && v.editable ? edit : undefined}
+              />
             </li>
           ))}
         </ul>
@@ -212,6 +255,24 @@ export default function VoucherBook({ props, title, subtitle, tabs }: { props: S
           }}
         />
       )}
+      {editing && (
+        <VoucherEditor
+          kind={editing.kind}
+          ws={ws}
+          scope={scope}
+          parties={parties}
+          onPartyAdded={reload}
+          editing={editing}
+          onClose={() => setEditing(null)}
+          onSaved={async (v) => {
+            setEditing(null);
+            notify(`${KIND_LABEL[v.kind]} ${v.number} updated · ${money(v.total)}`);
+            setTick((t) => t + 1);
+            setViewing(v);
+            if (stockEffect(v.kind)) await refresh();
+          }}
+        />
+      )}
       {viewing && (
         <VoucherDetail
           v={viewing}
@@ -220,6 +281,7 @@ export default function VoucherBook({ props, title, subtitle, tabs }: { props: S
           onClose={() => setViewing(null)}
           onConvert={convert}
           onCancel={cancel}
+          onEdit={isOwner && viewing.editable ? edit : undefined}
         />
       )}
     </div>
@@ -232,17 +294,21 @@ function Actions({
   whatsapp,
   onConvert,
   onCancel,
+  onEdit,
 }: {
   v: VoucherDTO;
   onPrint: () => void;
   whatsapp: string;
   onConvert: (v: VoucherDTO, to: VoucherKind) => void;
   onCancel: (v: VoucherDTO) => void;
+  /** Present only for the owner on editable bills. */
+  onEdit?: (v: VoucherDTO) => void;
 }) {
   const targets = v.status === "OPEN" ? CONVERSIONS[v.kind] ?? [] : [];
   return (
     <div className="mt-3 flex flex-wrap gap-1.5">
       <Button variant="ghost" className="px-2.5 py-1.5 text-xs" onClick={onPrint}>🖨 Print</Button>
+      {onEdit && <Button variant="ghost" className="px-2.5 py-1.5 text-xs" onClick={() => onEdit(v)}>✎ Edit</Button>}
       {v.shareToken && v.status !== "CANCELLED" && (
         <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="btn-3d btn-edge-in inline-flex items-center rounded-lg bg-in px-2.5 py-1.5 text-xs font-semibold text-white">
           WhatsApp
@@ -263,6 +329,7 @@ function VoucherDetail({
   onClose,
   onConvert,
   onCancel,
+  onEdit,
 }: {
   v: VoucherDTO;
   canSeeCosts: boolean;
@@ -270,6 +337,7 @@ function VoucherDetail({
   onClose: () => void;
   onConvert: (v: VoucherDTO, to: VoucherKind) => void;
   onCancel: (v: VoucherDTO) => void;
+  onEdit?: (v: VoucherDTO) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const url = shareUrl(v);
@@ -289,7 +357,7 @@ function VoucherDetail({
               <div className="min-w-0">
                 <div className="truncate font-semibold">{l.itemName}</div>
                 <div className="text-xs text-ink/60">
-                  {qty(l.qty)} {l.unit} × {money(l.rate)}{l.discountPct ? ` − ${l.discountPct}%` : ""}{v.gstEnabled ? ` + ${l.taxRate}% GST` : ""}
+                  {qty(l.qty)} {l.unit} × {money(l.rate)}{l.discountAmt > 0 ? ` − ${money(l.discountAmt)} (${Number(l.discountPct.toFixed(2))}%)` : ""}{v.gstEnabled ? ` + ${l.taxRate}% GST` : ""}
                   {canSeeCosts && l.costRate !== null ? ` · cost ${money(l.costRate)}` : ""}
                 </div>
               </div>
@@ -302,11 +370,40 @@ function VoucherDetail({
           {v.gstEnabled && (v.interState ? <Line label="IGST" value={money(v.igst)} /> : <><Line label="CGST" value={money(v.cgst)} /><Line label="SGST" value={money(v.sgst)} /></>)}
           {v.roundOff !== 0 && <Line label="Round off" value={money(v.roundOff)} />}
           <div className="flex justify-between border-t-2 border-ink/10 pt-1 text-base font-bold"><dt>Total</dt><dd>{money(v.total)}</dd></div>
-          {(v.kind === "SALE" || v.kind === "PURCHASE") && v.partyId && <Line label={v.kind === "SALE" ? "Received with bill" : "Paid with bill"} value={money(v.paid)} />}
+          {v.kind === "PURCHASE" && v.partyId && <Line label="Paid with bill" value={money(v.paid)} />}
+          {v.kind === "SALE" && (v.partyId || v.paidAtBilling > 0) && <Line label="Received" value={money(v.paid)} />}
+          {v.balanceDue > 0.005 && <Line label="Balance due" value={money(v.balanceDue)} tone="text-low font-semibold" />}
           {v.profit !== null && <Line label="Profit on this bill" value={money(v.profit)} tone={v.profit >= 0 ? "text-in" : "text-out"} />}
         </dl>
+        {v.payments.length > 0 && (
+          <div className="rounded-xl border-2 border-ink/10 px-3 py-2">
+            <div className="mb-1 text-xs font-bold uppercase tracking-wide text-ink/60">Payment details</div>
+            <ul className="space-y-1.5">
+              {v.payments.map((p) => (
+                <li key={p.id} className="text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="font-semibold">
+                      {PAYMENT_MODE_LABEL[p.mode] ?? p.mode}
+                      {p.mode === "FINANCE" && p.financier ? ` · ${p.financier}` : ""}
+                      {p.mode !== "FINANCE" && p.reference ? <span className="font-normal text-ink/60"> · {p.reference}</span> : null}
+                    </span>
+                    <span className="tabular-nums">{money(p.amount)}</span>
+                  </div>
+                  {p.mode === "FINANCE" && (
+                    <div className="text-xs text-ink/70">
+                      Disbursement {money(p.amount)} · Ref {p.paymentInfo || "—"} · Scheme {p.scheme || "—"}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {v.notes && <p className="rounded-lg bg-muted px-3 py-2 text-xs">{v.notes}</p>}
-        <p className="text-xs text-ink/50">Created by {v.createdBy || "—"}{v.sourceNumber ? ` · from ${v.sourceNumber}` : ""}</p>
+        <div className="rounded-lg bg-muted px-3 py-2">
+          <AuditTrail v={v} />
+          {v.sourceNumber && <div className="mt-0.5 text-xs text-ink/60">Made from {v.sourceNumber}</div>}
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={() => window.open(`/print/voucher/${v.id}`, "_blank")}>🖨 Print A4</Button>
           <Button variant="ghost" onClick={() => window.open(`/print/voucher/${v.id}?format=t80`, "_blank")}>🧾 Thermal</Button>
@@ -332,6 +429,7 @@ function VoucherDetail({
         {v.status === "OPEN" && (
           <div className="flex flex-wrap gap-2 border-t-2 border-ink/10 pt-3">
             {(CONVERSIONS[v.kind] ?? []).map((t) => <Button key={t} onClick={() => onConvert(v, t)}>→ Convert to {KIND_LABEL[t].toLowerCase()}</Button>)}
+            {onEdit && <Button variant="ghost" onClick={() => onEdit(v)}>✎ Edit {KIND_LABEL[v.kind].toLowerCase()}</Button>}
             <Button variant="danger" onClick={() => onCancel(v)}>Cancel {KIND_LABEL[v.kind].toLowerCase()}</Button>
           </div>
         )}

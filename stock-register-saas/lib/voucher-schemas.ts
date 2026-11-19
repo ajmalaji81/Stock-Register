@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { INDIAN_STATES, VOUCHER_KINDS } from "./gst";
+import { BILL_PAYMENT_MODES, INDIAN_STATES, MAX_BILL_PAYMENTS, VOUCHER_KINDS } from "./gst";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD");
 const text = (max: number) => z.string().trim().max(max).default("");
@@ -11,8 +11,20 @@ export const voucherLineSchema = z.object({
   description: text(200),
   qty: z.coerce.number().positive("Quantity must be more than 0").max(1e9),
   rate: z.coerce.number().min(0, "Rate must be 0 or more").max(1e10),
-  discountPct: z.coerce.number().min(0).max(100).default(0),
+  discountPct: z.coerce.number().min(0, "Discount can't be negative").max(100, "Discount can't be more than 100%").default(0),
+  /** ₹ discount on the line. When > 0 it is used and the % is worked out from it. */
+  discountAmt: z.coerce.number().min(0, "Discount can't be negative").max(1e10).default(0),
   taxRate: z.coerce.number().min(0).max(100).default(0),
+});
+
+/** One payment taken with a sales invoice (split payment). FINANCE details are checked in lib/gst.ts paymentError. */
+export const billPaymentSchema = z.object({
+  mode: z.enum(BILL_PAYMENT_MODES),
+  amount: z.coerce.number().min(0).max(1e10),
+  reference: text(80),
+  financier: text(80),
+  paymentInfo: text(120),
+  scheme: text(200),
 });
 
 export const voucherCreateSchema = z.object({
@@ -24,10 +36,20 @@ export const voucherCreateSchema = z.object({
   placeOfSupply: text(60),
   notes: text(500),
   lines: z.array(voucherLineSchema).min(1, "Add at least one item").max(200),
-  /** SALE / PURCHASE only: payment recorded with the bill. */
+  /** SALE only: how the customer paid at the counter (split across modes, incl. FINANCE). */
+  payments: z.array(billPaymentSchema).max(MAX_BILL_PAYMENTS, `Use at most ${MAX_BILL_PAYMENTS} payment modes`).default([]),
+  /** Older single-payment fields. SALE: turned into one payments row. PURCHASE: paid to the supplier. */
   paidNow: z.coerce.number().min(0).max(1e10).default(0),
-  paymentMode: z.enum(["CASH", "BANK", "UPI", "CHEQUE"]).default("CASH"),
+  paymentMode: z.enum(BILL_PAYMENT_MODES).default("CASH"),
 });
+
+/**
+ * Editing a saved bill (owner only): same fields as create minus kind / legacy payment fields.
+ * `payments` omitted = keep the bill's current payments; an array (even empty) replaces them.
+ */
+export const voucherEditSchema = voucherCreateSchema
+  .omit({ kind: true, paidNow: true, paymentMode: true, payments: true })
+  .extend({ payments: z.array(billPaymentSchema).max(MAX_BILL_PAYMENTS).optional() });
 
 export const voucherConvertSchema = z.object({
   to: voucherKind,

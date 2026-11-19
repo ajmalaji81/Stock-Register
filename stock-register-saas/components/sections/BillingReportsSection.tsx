@@ -6,6 +6,7 @@ import { KIND_LABEL } from "@/lib/gst";
 import type { SalesReport } from "@/lib/voucher-service";
 import { api } from "../billing/api";
 import { Button, Empty, Field, Input, SectionHeader, Stat, Tabs, downloadCsv, money, qty } from "../ui";
+import MonthlyReport from "../charts/MonthlyReport";
 import type { SectionProps } from "./types";
 
 type View = "register" | "gst" | "hsn" | "profit";
@@ -15,7 +16,25 @@ function monthStart(): string {
   return todayISO(new Date(d.getFullYear(), d.getMonth(), 1));
 }
 
-export default function BillingReportsSection({ can, version, notify }: SectionProps) {
+export default function BillingReportsSection(props: SectionProps) {
+  const [mode, setMode] = useState<"period" | "monthly">("monthly");
+  const tabs = (
+    <div className="print:hidden">
+      <Tabs tabs={[["monthly", "📊 Monthly analysis"], ["period", "Bills & GST by date"]]} value={mode} onChange={setMode} label="Report type" />
+    </div>
+  );
+  if (mode === "monthly")
+    return (
+      <div className="space-y-4">
+        <SectionHeader title="Sales analysis" subtitle="Month-wise sales after returns. Cancelled bills are excluded." />
+        {tabs}
+        <MonthlyReport scope={props.scope} scopeName={props.scopeName} version={props.version} notify={props.notify} />
+      </div>
+    );
+  return <PeriodReport {...props} tabs={tabs} />;
+}
+
+function PeriodReport({ can, version, notify, tabs }: SectionProps & { tabs: ReactNode }) {
   const [side, setSide] = useState<"sales" | "purchases">("sales");
   const [view, setView] = useState<View>("register");
   const [from, setFrom] = useState(monthStart());
@@ -76,6 +95,7 @@ export default function BillingReportsSection({ can, version, notify }: SectionP
           </div>
         }
       />
+      {tabs}
       <div className="flex flex-wrap items-end gap-3 print:hidden">
         {canPurchases && <Tabs tabs={[["sales", "Sales"], ["purchases", "Purchases"]]} value={side} onChange={setSide} label="Side" />}
         <Field label="From"><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>

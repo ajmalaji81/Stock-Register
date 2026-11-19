@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { currentActor } from "@/lib/actor";
 import { StockError } from "@/lib/engine";
-import { amountInWords, KIND_LABEL, r2 } from "@/lib/gst";
+import { amountInWords, KIND_LABEL, PAYMENT_MODE_LABEL, r2 } from "@/lib/gst";
 import { getSharedVoucher, getVoucher, profileOf, type BusinessProfile, type VoucherDTO } from "@/lib/voucher-service";
 import PrintBar from "@/components/invoice/PrintBar";
 
@@ -79,7 +79,7 @@ function taxBreakup(v: VoucherDTO) {
 
 function A4({ v, p }: { v: VoucherDTO; p: BusinessProfile }) {
   const lines = v.lines ?? [];
-  const showDisc = lines.some((l) => l.discountPct > 0);
+  const showDisc = lines.some((l) => l.discountAmt > 0 || l.discountPct > 0);
   const breakup = v.gstEnabled ? taxBreakup(v) : [];
   return (
     <>
@@ -144,7 +144,18 @@ function A4({ v, p }: { v: VoucherDTO; p: BusinessProfile }) {
                 <td className="py-1.5 pr-2">{l.hsn}</td>
                 <td className="py-1.5 pr-2 text-right tabular-nums">{num.format(l.qty)} {l.unit}</td>
                 <td className="py-1.5 pr-2 text-right tabular-nums">{inr.format(l.rate)}</td>
-                {showDisc && <td className="py-1.5 pr-2 text-right tabular-nums">{l.discountPct ? `${l.discountPct}%` : ""}</td>}
+                {showDisc && (
+                  <td className="py-1.5 pr-2 text-right tabular-nums">
+                    {l.discountAmt > 0 ? (
+                      <>
+                        {inr.format(l.discountAmt)}
+                        <div className="text-black/60">{pct(l.discountPct)}</div>
+                      </>
+                    ) : (
+                      ""
+                    )}
+                  </td>
+                )}
                 <td className="py-1.5 pr-2 text-right tabular-nums">{inr.format(l.taxable)}</td>
                 {v.gstEnabled && <td className="py-1.5 pr-2 text-right tabular-nums">{l.taxRate}%<div className="text-black/60">{inr.format(l.tax)}</div></td>}
                 <td className="py-1.5 text-right font-semibold tabular-nums">{inr.format(l.amount)}</td>
@@ -194,9 +205,10 @@ function A4({ v, p }: { v: VoucherDTO; p: BusinessProfile }) {
             {v.gstEnabled && (v.interState ? <Tot label="IGST" value={rs(v.igst)} /> : <><Tot label="CGST" value={rs(v.cgst)} /><Tot label="SGST" value={rs(v.sgst)} /></>)}
             {v.roundOff !== 0 && <Tot label="Round off" value={rs(v.roundOff)} />}
             <div className="flex justify-between gap-6 border-y-2 border-black py-1 text-base font-bold"><dt>Total</dt><dd>{rs(v.total)}</dd></div>
-            {v.paid > 0 && <><Tot label="Paid" value={rs(v.paid)} /><Tot label="Balance" value={rs(r2(v.total - v.paid))} /></>}
+            {v.paid > 0 && <><Tot label="Paid" value={rs(v.paid)} /><Tot label="Balance due" value={rs(v.balanceDue)} /></>}
           </dl>
         </section>
+        <PaymentDetails v={v} />
 
         <footer className="mt-6 grid gap-4 border-t border-black/30 pt-3 sm:grid-cols-2">
           <div className="space-y-2 text-[12px]">
@@ -208,9 +220,62 @@ function A4({ v, p }: { v: VoucherDTO; p: BusinessProfile }) {
             <div className="text-xs">Authorised signatory</div>
           </div>
         </footer>
-        <p className="mt-6 text-center text-[10px] text-black/40">Made with GodownBook</p>
+        <Prepared v={v} className="mt-4 text-[11px] text-black/60" />
+        <p className="mt-4 text-center text-[10px] text-black/40">Made with GodownBook</p>
       </article>
     </>
+  );
+}
+
+/** Who prepared (and last edited) the bill. Names only, never emails. */
+function Prepared({ v, className = "" }: { v: VoucherDTO; className?: string }) {
+  const at = (iso: string) => new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
+  if (!v.createdBy && !v.updatedAt) return null;
+  return (
+    <div className={className}>
+      {v.createdBy && <div>Prepared by {v.createdBy} · {at(v.createdAt)}</div>}
+      {v.updatedAt && <div>Last edited by {v.updatedBy || "owner"} · {at(v.updatedAt)}</div>}
+    </div>
+  );
+}
+
+const pct = (n: number) => `${Number(n.toFixed(2))}%`;
+
+/** How the customer paid (split payment), incl. finance details. A4 only; thermal has a compact copy. */
+function PaymentDetails({ v }: { v: VoucherDTO }) {
+  if (v.payments.length === 0) return null;
+  return (
+    <section className="mt-4 border-t border-black/30 pt-3">
+      <div className="text-xs font-bold uppercase text-black/60">Payment details</div>
+      <table className="mt-1 w-full max-w-[520px] text-[12px]">
+        <tbody>
+          {v.payments.map((p) => (
+            <tr key={p.id} className="border-b border-black/10 align-top">
+              <td className="py-1 pr-3 font-semibold">{PAYMENT_MODE_LABEL[p.mode] ?? p.mode}</td>
+              <td className="py-1 pr-3">
+                {p.mode === "FINANCE" ? (
+                  <>
+                    <div>
+                      <b>{p.financier}</b> · Disbursement amount {rs(p.amount)}
+                    </div>
+                    <div className="text-black/70">Payment info: {p.paymentInfo || "—"}</div>
+                    <div className="text-black/70">Scheme: {p.scheme || "—"}</div>
+                  </>
+                ) : (
+                  <span className="text-black/70">{p.reference}</span>
+                )}
+              </td>
+              <td className="py-1 text-right tabular-nums">{rs(p.amount)}</td>
+            </tr>
+          ))}
+          <tr className="font-semibold">
+            <td className="py-1 pr-3">Total paid</td>
+            <td />
+            <td className="py-1 text-right tabular-nums">{rs(v.paidAtBilling)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
   );
 }
 
@@ -258,7 +323,11 @@ function Thermal({ v, p, width }: { v: VoucherDTO; p: BusinessProfile; width: 58
           <tbody>
             {lines.map((l) => (
               <tr key={l.id} className="align-top">
-                <td className="pr-1">{l.itemName}{v.gstEnabled && l.taxRate ? <span> ({l.taxRate}%)</span> : null}</td>
+                <td className="pr-1">
+                  {l.itemName}
+                  {v.gstEnabled && l.taxRate ? <span> ({l.taxRate}%)</span> : null}
+                  {l.discountAmt > 0 ? <div>Disc -{inr.format(l.discountAmt)} ({pct(l.discountPct)})</div> : null}
+                </td>
                 <td className="text-right">{num.format(l.qty)}</td>
                 {!small && <td className="text-right">{inr.format(l.rate)}</td>}
                 <td className="text-right">{inr.format(l.amount)}</td>
@@ -271,10 +340,29 @@ function Thermal({ v, p, width }: { v: VoucherDTO; p: BusinessProfile; width: 58
           {v.gstEnabled && (v.interState ? <Tot label="IGST" value={inr.format(v.igst)} /> : <><Tot label="CGST" value={inr.format(v.cgst)} /><Tot label="SGST" value={inr.format(v.sgst)} /></>)}
           {v.roundOff !== 0 && <Tot label="Round off" value={inr.format(v.roundOff)} />}
           <div className={`flex justify-between border-y border-black py-0.5 font-bold ${small ? "text-[12px]" : "text-[14px]"}`}><dt>TOTAL</dt><dd>{rs(v.total)}</dd></div>
-          {v.paid > 0 && <><Tot label="Paid" value={inr.format(v.paid)} /><Tot label="Balance" value={inr.format(r2(v.total - v.paid))} /></>}
+          {v.discount > 0 && <Tot label="You saved" value={inr.format(v.discount)} />}
+          {v.paid > 0 && <><Tot label="Paid" value={inr.format(v.paid)} /><Tot label="Balance due" value={inr.format(v.balanceDue)} /></>}
         </dl>
+        {v.payments.length > 0 && (
+          <div className="mt-1 border-t border-dashed border-black pt-1">
+            {v.payments.map((p) => (
+              <div key={p.id}>
+                <div className="flex justify-between">
+                  <span>{p.mode === "FINANCE" ? `Finance: ${p.financier}` : `${PAYMENT_MODE_LABEL[p.mode] ?? p.mode}${p.reference ? ` ${p.reference}` : ""}`}</span>
+                  <span>{inr.format(p.amount)}</span>
+                </div>
+                {p.mode === "FINANCE" && (
+                  <div>
+                    Disb. {inr.format(p.amount)} · Ref {p.paymentInfo} · {p.scheme}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         <div className="mt-1">{amountInWords(v.total)}</div>
         {p.invoiceTerms && <div className="mt-1 whitespace-pre-line border-t border-dashed border-black pt-1">{p.invoiceTerms}</div>}
+        <Prepared v={v} className="mt-1 border-t border-dashed border-black pt-1" />
         <div className="mt-2 text-center">Thank you! Visit again.</div>
       </article>
     </>

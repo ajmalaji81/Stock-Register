@@ -14,11 +14,15 @@ export const GST_RATES = [0, 0.25, 3, 5, 12, 18, 28];
 
 export const r2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
 
+export const r4 = (n: number): number => Math.round((n + Number.EPSILON) * 10000) / 10000;
+
 export interface LineInput {
   qty: number;
   /** Price per unit before tax. */
   rate: number;
   discountPct?: number;
+  /** Discount in ₹ on the whole line (before tax). When > 0 it wins over discountPct. */
+  discountAmt?: number;
   taxRate?: number;
 }
 
@@ -26,14 +30,33 @@ export interface LineResult {
   taxable: number;
   tax: number;
   amount: number;
+  /** ₹ discount actually applied (2 dp). */
+  discount: number;
+  /** Discount as % of qty × rate (4 dp), derived when the ₹ amount was given. */
+  discountPct: number;
+}
+
+/**
+ * The discount on one line, from either a ₹ amount or a %, as both numbers.
+ * ₹ wins when > 0. Clamped to 0..gross so a line can never go negative.
+ */
+export function lineDiscount(qty: number, rate: number, discountPct = 0, discountAmt = 0): { amount: number; pct: number } {
+  const gross = qty * rate;
+  if (gross <= 0) return { amount: 0, pct: 0 };
+  if (discountAmt > 0) {
+    const amount = r2(Math.min(discountAmt, gross));
+    return { amount, pct: r4((amount / gross) * 100) };
+  }
+  const pct = Math.min(100, Math.max(0, discountPct));
+  return { amount: r2((gross * pct) / 100), pct: r4(pct) };
 }
 
 export function calcLine(l: LineInput, gstEnabled = true): LineResult {
   const gross = l.qty * l.rate;
-  const disc = Math.min(100, Math.max(0, l.discountPct ?? 0));
-  const taxable = r2(gross * (1 - disc / 100));
+  const d = lineDiscount(l.qty, l.rate, l.discountPct ?? 0, l.discountAmt ?? 0);
+  const taxable = r2(gross - d.amount);
   const tax = gstEnabled ? r2((taxable * Math.max(0, l.taxRate ?? 0)) / 100) : 0;
-  return { taxable, tax, amount: r2(taxable + tax) };
+  return { taxable, tax, amount: r2(taxable + tax), discount: d.amount, discountPct: d.pct };
 }
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
@@ -177,4 +200,118 @@ export function isPurchaseSide(kind: VoucherKind): boolean {
 
 export function formatNumber(prefix: string, seq: number): string {
   return `${prefix}-${String(seq).padStart(4, "0")}`;
+}
+
+// ---------- Editing (owner only) ----------
+
+/** Kinds the owner may edit after saving. Extend this list to allow editing other bills. */
+export const EDITABLE_KINDS: VoucherKind[] = ["SALE"];
+
+/** Why a voucher can't be edited, or null if it can. */
+export function editBlockReason(kind: VoucherKind, status: string, sourceKind: VoucherKind | null): string | null {
+  if (!EDITABLE_KINDS.includes(kind)) return `${KIND_LABEL[kind]}s can't be edited. Cancel it and create a new one.`;
+  if (status === "CANCELLED") return "This bill is cancelled and can't be edited.";
+  if (status === "CONVERTED") return "This bill was converted into another document and can't be edited.";
+  if (sourceKind === "CHALLAN") return "This bill was made from a delivery challan (the stock moved with the challan), so it can't be edited. Cancel it and convert the challan again.";
+  return null;
+}
+
+/**
+ * Net stock a voucher has currently moved, per item + godown, from its ledger entries
+ * (original entries plus any edit reversals). Positive = stock added, negative = removed.
+ */
+export function netStockEffect(entries: { itemId: string; godownId: string; qtyIn: number; qtyOut: number }[]): {
+  itemId: string;
+  godownId: string;
+  qty: number;
+}[] {
+  const map = new Map<string, { itemId: string; godownId: string; qty: number }>();
+  for (const e of entries) {
+    const key = `${e.itemId}|${e.godownId}`;
+    const cur = map.get(key) ?? { itemId: e.itemId, godownId: e.godownId, qty: 0 };
+    cur.qty = Math.round((cur.qty + e.qtyIn - e.qtyOut) * 1000) / 1000;
+    map.set(key, cur);
+  }
+  return [...map.values()].filter((x) => x.qty !== 0);
+}
+
+// ---------- Payments at billing (split payment + finance) ----------
+
+export const BILL_PAYMENT_MODES = ["CASH", "CARD", "UPI", "BANK", "CHEQUE", "FINANCE"] as const;
+export type BillPaymentMode = (typeof BILL_PAYMENT_MODES)[number];
+
+export const PAYMENT_MODE_LABEL: Record<BillPaymentMode, string> = {
+  CASH: "Cash",
+  CARD: "Card",
+  UPI: "UPI",
+  BANK: "Bank transfer",
+  CHEQUE: "Cheque",
+  FINANCE: "Finance",
+};
+
+/** Consumer-durable financiers shown in the FINANCE picker. "Other" lets the user type a name. */
+export const FINANCIERS = [
+  "Bajaj Finserv",
+  "HDFC Bank",
+  "HDB Financial Services",
+  "TVS Credit",
+  "Home Credit",
+  "IDFC FIRST Bank",
+  "ICICI Bank",
+  "Kotak Mahindra Bank",
+  "Samsung Finance+",
+  "Axis Bank",
+] as const;
+
+export const MAX_BILL_PAYMENTS = 6;
+
+export interface BillPaymentInput {
+  mode: BillPaymentMode;
+  /** For FINANCE: the disbursement amount. */
+  amount: number;
+  reference?: string;
+  financier?: string;
+  paymentInfo?: string;
+  scheme?: string;
+}
+
+/**
+ * Check the payments taken with a sales invoice. Returns an error message, or null when OK.
+ * - every row > 0; FINANCE rows need financier, payment info and scheme
+ * - paid (plus payments already recorded later against the bill) can't exceed the total
+ * - a walk-in bill (no party) with payments must be paid in full
+ */
+export function paymentError(
+  rows: BillPaymentInput[],
+  opts: { total: number; hasParty: boolean; otherPaid?: number },
+): string | null {
+  if (rows.length > MAX_BILL_PAYMENTS) return `Use at most ${MAX_BILL_PAYMENTS} payment modes on one bill`;
+  for (const [i, p] of rows.entries()) {
+    const n = rows.length > 1 ? ` (payment ${i + 1})` : "";
+    if (!BILL_PAYMENT_MODES.includes(p.mode)) return `Choose a payment mode${n}`;
+    if (!(p.amount > 0)) return p.mode === "FINANCE" ? `Enter the finance disbursement amount${n}` : `Enter the amount for ${PAYMENT_MODE_LABEL[p.mode]}${n}`;
+    if (p.mode === "FINANCE") {
+      if (!p.financier?.trim()) return `Choose the financier (Bajaj, HDFC…) for the finance payment${n}`;
+      if (!p.paymentInfo?.trim()) return `Enter the finance payment info (loan / agreement / DO number)${n}`;
+      if (!p.scheme?.trim()) return `Enter the finance scheme details (EMIs, down payment…)${n}`;
+    }
+  }
+  const paid = r2(rows.reduce((a, p) => a + p.amount, 0));
+  const other = r2(opts.otherPaid ?? 0);
+  if (paid + other > opts.total + 0.005)
+    return other > 0
+      ? `Payments (₹${paid}) plus ₹${other} already received come to more than the bill total (₹${opts.total})`
+      : `Payments (₹${paid}) are more than the bill total (₹${opts.total})`;
+  if (!opts.hasParty && rows.length > 0 && Math.abs(paid - opts.total) > 0.005)
+    return "A walk-in sale must be fully paid. Pick a customer to sell on credit.";
+  return null;
+}
+
+const inrWhole = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+
+/** "CARD 5,000 · UPI 4,000 · CASH 1,000" / "FINANCE (Bajaj Finserv) 60,000 · CASH 20,000" */
+export function paymentSummary(rows: { mode: string; amount: number; financier?: string }[]): string {
+  return rows
+    .map((p) => `${p.mode}${p.mode === "FINANCE" && p.financier ? ` (${p.financier})` : ""} ${inrWhole(p.amount)}`)
+    .join(" · ");
 }

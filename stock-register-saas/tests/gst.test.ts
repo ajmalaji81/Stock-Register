@@ -12,8 +12,8 @@ import {
 } from "../lib/gst.ts";
 
 test("calcLine: discount then tax, rounded to paise", () => {
-  assert.deepEqual(calcLine({ qty: 3, rate: 99.99, discountPct: 10, taxRate: 18 }), { taxable: 269.97, tax: 48.59, amount: 318.56 });
-  assert.deepEqual(calcLine({ qty: 2, rate: 50, taxRate: 5 }, false), { taxable: 100, tax: 0, amount: 100 });
+  assert.deepEqual(calcLine({ qty: 3, rate: 99.99, discountPct: 10, taxRate: 18 }), { taxable: 269.97, tax: 48.59, amount: 318.56, discount: 30, discountPct: 10 });
+  assert.deepEqual(calcLine({ qty: 2, rate: 50, taxRate: 5 }, false), { taxable: 100, tax: 0, amount: 100, discount: 0, discountPct: 0 });
   // Discount is clamped to 0..100
   assert.equal(calcLine({ qty: 1, rate: 100, discountPct: 150, taxRate: 18 }).taxable, 0);
 });
