@@ -13,6 +13,9 @@
   var num = function (el) { var v = parseFloat(el.value); return isFinite(v) ? v : 0; };
   var json = function (id, d) { try { return JSON.parse(document.getElementById(id).textContent); } catch (e) { return d; } };
   var total = 0;
+  var isSale = form.dataset.kind === "SALE", voucherId = form.dataset.voucher || "";
+  var enc = encodeURIComponent;
+  var getJSON = function (url) { return fetch(url, { credentials: "same-origin" }).then(function (r) { return r.json(); }); };
 
   // A save the server rejects redirects back to a fresh form. Keep what was typed in this tab and put it back
   // (once, only when that redirect brought an error message).
@@ -125,11 +128,16 @@
     var tracked = o && o.getAttribute("data-serial") === "1";
     var box = tr.querySelector(".serial-box");
     box.hidden = !tracked;
-    if (!tracked) { tr.querySelector(".f-serials").value = ""; return; }
+    if (!tracked) { tr.querySelector(".f-serials").value = ""; if (isSale) layoutSerial(); return; }
     var n = tokens(tr).length, q = num(tr.querySelector(".f-qty"));
     var el = tr.querySelector(".f-scount");
-    el.textContent = n + " of " + q + " IMEI" + (q === 1 ? "" : "s") + " entered";
-    el.className = "f-scount " + (n === q ? "in" : "out");
+    if (el) {
+      el.textContent = n + " of " + q + " IMEI" + (q === 1 ? "" : "s") + " entered";
+      el.className = "f-scount " + (n === q ? "in" : "out");
+    }
+    var vb = tr.querySelector(".f-sview");
+    if (vb) vb.textContent = n ? n + " IMEI" : "Select IMEIs";
+    if (isSale) layoutSerial();
   }
 
   function addLine(d) {
@@ -139,12 +147,16 @@
       var o = e.target.options[e.target.selectedIndex];
       tr.querySelector(".f-rate").value = o.getAttribute("data-price") || 0;
       tr.querySelector(".f-tax").value = o.getAttribute("data-gst") || 0;
+      if (isSale) tr.querySelector(".f-serials").value = "";
       serialUI(tr);
       recalc();
+      if (isSale && o && o.getAttribute("data-serial") === "1") openModal(tr);
     });
     tr.querySelector(".f-serials").addEventListener("input", function () { serialUI(tr); });
+    var viewBtn = tr.querySelector(".f-sview");
+    if (viewBtn) viewBtn.addEventListener("click", function () { openModal(tr); });
     tr.querySelector(".f-qty").addEventListener("input", function () { serialUI(tr); });
-    tr.querySelector(".f-sfile").addEventListener("change", function (e) {
+    (tr.querySelector(".f-sfile") || document.createElement("input")).addEventListener("change", function (e) {
       var f = e.target.files[0]; if (!f) return;
       var r = new FileReader();
       r.onload = function () {
@@ -157,7 +169,7 @@
     tr.querySelector(".f-discamt").addEventListener("input", function () { tr.dataset.src = "amt"; });
     tr.querySelector(".f-disc").addEventListener("input", function () { tr.dataset.src = "pct"; });
     tr.querySelector(".f-del").addEventListener("click", function () {
-      if (table.querySelectorAll("tr.line").length > 1) { tr.remove(); recalc(); }
+      if (table.querySelectorAll("tr.line").length > 1) { tr.remove(); recalc(); layoutSerial(); }
     });
     if (d) {
       sel.value = d.itemId;
@@ -207,6 +219,144 @@
   if (pays) {
     document.getElementById("add-pay").addEventListener("click", function () { addPay(); });
     (draft ? draft.pays : json("edit-pays", [])).forEach(addPay);
+  }
+
+  // ---------- mark IMEIs from stock (sales) ----------
+  // The first line shows its IMEI list inline; every other line has a button that opens the same list in a popup.
+  var primary = function (t) { return t.split("/")[0].trim().toUpperCase(); };
+  function usedElsewhere(tr) {
+    var u = {};
+    table.querySelectorAll("tr.line").forEach(function (o) {
+      if (o !== tr) tokens(o).forEach(function (t) { t.split("/").forEach(function (x) { u[x.trim().toUpperCase()] = 1; }); });
+    });
+    return u;
+  }
+  function fillList(tr, listEl, q) {
+    var item = tr.querySelector(".f-item").value;
+    if (!item) { listEl.textContent = ""; return; }
+    listEl.textContent = "Loading…";
+    getJSON("/app/serial-lookup/available?item=" + enc(item) + "&godown=" + enc(form.elements.godownId.value) + "&voucher=" + enc(voucherId))
+      .then(function (units) {
+        var used = usedElsewhere(tr), have = {};
+        tokens(tr).forEach(function (t) { have[primary(t)] = 1; });
+        listEl.textContent = "";
+        if (!units.length) { listEl.textContent = "No unit of this model is in stock at the selected godown."; return; }
+        units.forEach(function (u) {
+          var lab = document.createElement("label"), cb = document.createElement("input");
+          cb.type = "checkbox"; cb.value = u.imei; cb.checked = !!have[u.imei];
+          var busy = used[u.imei] || (u.imei2 && used[u.imei2]);
+          if (busy) { cb.disabled = true; lab.className = "used"; }
+          lab.appendChild(cb);
+          lab.appendChild(document.createTextNode(u.imei + (u.imei2 ? " / " + u.imei2 : "") + (busy ? " (on another line)" : "")));
+          listEl.appendChild(lab);
+        });
+        listEl.onchange = function () {
+          var all = {};
+          units.forEach(function (x) { all[x.imei] = 1; });
+          var keep = tokens(tr).filter(function (t) { return !all[primary(t)]; });  // not in this list: leave as is
+          var chosen = Array.prototype.map.call(listEl.querySelectorAll("input:checked"), function (c) { return c.value; });
+          var out = keep.concat(chosen);
+          tr.querySelector(".f-serials").value = out.join("\n");
+          if (out.length) tr.querySelector(".f-qty").value = out.length;
+          serialUI(tr); recalc();
+        };
+        if (q) {
+          q.value = "";
+          var refilter = function () {
+            var w = q.value.trim().toUpperCase();
+            listEl.querySelectorAll("label").forEach(function (l) { l.style.display = !w || l.textContent.toUpperCase().indexOf(w) >= 0 ? "" : "none"; });
+          };
+          q.oninput = refilter;
+          q.onkeydown = function (e) {  // Enter marks the IMEI the search found
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            var w = q.value.trim().toUpperCase();
+            if (!w) return;
+            var boxes = Array.prototype.filter.call(listEl.querySelectorAll("label"), function (l) { return l.style.display !== "none"; })
+              .map(function (l) { return l.querySelector("input"); }).filter(function (c) { return !c.disabled; });
+            var pick = boxes.filter(function (c) { return c.parentNode.textContent.toUpperCase().split(/[\s/]+/).indexOf(w) >= 0; })[0] || boxes[0];
+            if (!pick) return;
+            if (!pick.checked) { pick.checked = true; listEl.onchange(); }
+            q.value = ""; refilter(); q.focus();
+          };
+        }
+      })
+      .catch(function () { listEl.textContent = "Couldn't load the IMEI list."; });
+  }
+  function layoutSerial() {  // every tracked sales line gets the "n IMEI" button; the list itself lives in the popup
+    table.querySelectorAll("tr.line").forEach(function (tr) {
+      var vb = tr.querySelector(".f-sview");
+      if (vb) vb.hidden = tr.querySelector(".serial-box").hidden;
+    });
+  }
+
+  var modal = document.getElementById("spick-modal"), mList = document.getElementById("spick-mlist"), mQ = document.getElementById("spick-mq");
+  function openModal(tr) {
+    var sel = tr.querySelector(".f-item");
+    if (!sel.value) return;
+    document.getElementById("spick-title").textContent = sel.options[sel.selectedIndex].text + " — mark IMEIs";
+    modal.hidden = false;
+    fillList(tr, mList, mQ);
+    mQ.focus();
+  }
+  function closeModal() { if (modal) { modal.hidden = true; mList.textContent = ""; } }
+  if (modal) {
+    document.getElementById("spick-done").addEventListener("click", closeModal);
+    modal.addEventListener("mousedown", function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !modal.hidden) closeModal(); });
+  }
+
+  // ---------- POS mode: scan an IMEI, the model is looked up and added ----------
+  var posToggle = document.getElementById("pos-toggle");
+  var posScan = document.getElementById("pos-scan"), posMsg = document.getElementById("pos-msg");
+  function say(text, bad) { posMsg.textContent = text; posMsg.className = "pos-msg " + (bad ? "bad" : "ok"); }
+  function lineTokens() {
+    var u = {};
+    table.querySelectorAll("tr.line").forEach(function (o) {
+      tokens(o).forEach(function (t) { t.split("/").forEach(function (x) { u[x.trim().toUpperCase()] = 1; }); });
+    });
+    return u;
+  }
+  function posAdd(code) {
+    code = code.trim().toUpperCase();
+    if (!code) return;
+    if (lineTokens()[code]) { say(code + " is already on this bill", true); return; }
+    getJSON("/app/serial-lookup/find?code=" + enc(code) + "&godown=" + enc(form.elements.godownId.value) + "&voucher=" + enc(voucherId))
+      .then(function (r) {
+        if (!r.ok) { say(r.error, true); return; }
+        if (lineTokens()[r.imei]) { say(r.imei + " is already on this bill", true); return; }
+        var lines = Array.prototype.slice.call(table.querySelectorAll("tr.line"));
+        var same = lines.filter(function (tr) { return tr.querySelector(".f-item").value === r.itemId; })[0];
+        if (same) {
+          var ta = same.querySelector(".f-serials");
+          ta.value = (ta.value.trim() ? ta.value.trim() + "\n" : "") + r.imei;
+          same.querySelector(".f-qty").value = tokens(same).length;
+          serialUI(same);
+        } else {
+          var opt = Array.prototype.filter.call(tpl.content.querySelector(".f-item").options, function (o) { return o.value === r.itemId; })[0];
+          lines.filter(function (tr) { return !tr.querySelector(".f-item").value; }).forEach(function (tr) { tr.remove(); });  // the empty starter line
+          addLine({
+            itemId: r.itemId, description: "", qty: 1, rate: opt ? opt.getAttribute("data-price") : 0, discountPct: 0,
+            taxRate: opt ? opt.getAttribute("data-gst") : 0, serials: r.imei,
+          });
+        }
+        recalc();
+        say("Added " + r.name + " · " + r.imei, false);
+      })
+      .catch(function () { say("Couldn't look that up. Check your connection.", true); });
+  }
+  if (posToggle) {
+    posToggle.addEventListener("change", function () {
+      posScan.hidden = !posToggle.checked;
+      if (posToggle.checked) posScan.focus(); else say("", false);
+    });
+    posScan.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter") return;
+      e.preventDefault();  // never submit the bill from the scan box
+      var code = posScan.value; posScan.value = "";
+      posAdd(code);
+      posScan.focus();
+    });
   }
 
   // ---------- submit guard ----------

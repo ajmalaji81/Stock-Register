@@ -9,7 +9,11 @@
     try { return (fr.contentDocument.title || "").replace(/\s+[—-]\s+GodownBook$/, "") || "Loading…"; } catch (e) { return "Page"; }
   }
   function urlOf(t) {
-    try { var l = t.frame.contentWindow.location; return l.pathname + l.search; } catch (e) { return t.url; }
+    try {
+      var l = t.frame.contentWindow.location;
+      if (l.protocol === "about:" || l.pathname.indexOf("/app") !== 0) return t.url;  // not loaded yet
+      return l.pathname + l.search;
+    } catch (e) { return t.url; }
   }
   function save() {
     try { sessionStorage.setItem(KEY, JSON.stringify({ urls: tabs.map(urlOf), active: tabs.indexOf(active) })); } catch (e) {}
@@ -85,7 +89,8 @@
   var saved = null;
   try { saved = JSON.parse(sessionStorage.getItem(KEY)); } catch (e) {}
   if (saved && saved.urls && saved.urls.length) {
-    saved.urls.slice(0, MAX).forEach(function (u) { open(u); });
+    saved.urls.slice(0, MAX).forEach(function (u) { if (typeof u === "string" && u.indexOf("/app") === 0) open(u); });
     if (tabs[saved.active]) show(tabs[saved.active]);
-  } else { open("/app"); }
+  }
+  if (!tabs.length) open("/app");
 })();

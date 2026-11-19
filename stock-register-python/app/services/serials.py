@@ -311,3 +311,49 @@ def with_check_digit(base14: str) -> str:
         if luhn_ok(base14 + str(d)):
             return base14 + str(d)
     raise ValueError("unreachable")
+
+
+# ---------- picking units on a sales bill ----------
+
+
+def _sellable(unit: SerialUnit, godown_id: str, voucher_id: str) -> bool:
+    """In stock at this godown, or already on the bill being edited (editing undoes its sale first)."""
+    if unit.status == "IN_STOCK" and unit.godownId == godown_id:
+        return True
+    ev = active(unit)
+    return bool(voucher_id and unit.status == "SOLD" and ev and ev[-1].type == "SALE" and ev[-1].voucherId == voucher_id
+                and unit.godownId == godown_id)
+
+
+def available(db: Session, actor: Actor, item_id: str, godown_id: str, voucher_id: str = "", q: str = "", limit: int = 500) -> list[dict]:
+    """IMEIs of one model that can go on a sale from this godown (for the 'pick from stock' list)."""
+    if not can_use_godown(actor, godown_id):
+        return []
+    stmt = select(SerialUnit).where(
+        SerialUnit.userId == actor.account_id, SerialUnit.itemId == item_id, SerialUnit.godownId == godown_id,
+        SerialUnit.status.in_(("IN_STOCK", "SOLD")),
+    )
+    q = q.strip().upper()
+    if q:
+        stmt = stmt.where(or_(SerialUnit.imei.contains(q, autoescape=True), SerialUnit.imei2.contains(q, autoescape=True)))
+    units = db.execute(stmt.options(selectinload(SerialUnit.events)).order_by(SerialUnit.createdAt, SerialUnit.id)).scalars().all()
+    return [{"imei": u.imei, "imei2": u.imei2} for u in units if _sellable(u, godown_id, voucher_id)][:limit]
+
+
+def find_for_sale(db: Session, actor: Actor, code: str, godown_id: str, voucher_id: str = "") -> dict:
+    """POS scan: IMEI (either SIM) -> the model it belongs to, if it can be sold from this godown."""
+    code = code.strip().upper()
+    if not code:
+        raise StockError("Scan or type an IMEI")
+    unit = find_unit(db, actor.account_id, code)
+    if unit is None or unit.status == "VOID":
+        raise StockError(f"IMEI {code} isn't in your IMEI register")
+    item = db.get(Item, unit.itemId)
+    if item is None or item.userId != actor.account_id:
+        raise StockError(f"IMEI {code} isn't in your IMEI register")
+    names = _godown_names(db, actor.account_id)
+    if not _sellable(unit, godown_id, voucher_id):
+        if unit.status == "IN_STOCK":
+            raise StockError(f"{item.name} {unit.imei} is at {names.get(unit.godownId, '?')}, not at {names.get(godown_id, 'this godown')}. Transfer it first.")
+        raise StockError(f"{item.name} {unit.imei} can't be sold: {_where(unit, names)}")
+    return {"itemId": item.id, "name": item.name, "imei": unit.imei, "imei2": unit.imei2}

@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#16a34a">
-  <script>(function(){try{var m=localStorage.getItem('gb-mode')||'light',a=localStorage.getItem('gb-accent')||'blue';var d=m==='dark'||(m==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';document.documentElement.dataset.accent=a;}catch(e){}})();</script>
+  <script>(function(){try{var m=localStorage.getItem('gb-mode')||'light',a=localStorage.getItem('gb-accent')||'blue';var d=m==='dark'||(m==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';document.documentElement.dataset.accent=a;document.documentElement.dataset.ws=localStorage.getItem('gb-workspace')==='on'?'on':'off';}catch(e){}})();</script>
   <script>if(window.self!==window.top){document.documentElement.classList.add('embedded');}</script>
   <script src="/static/combo.js"></script>
   <title>{% block title %}GodownBook{% endblock %}</title>
@@ -22,7 +22,7 @@
     {{ logo("/app", 32) }}
     {% for g in nav %}
       <div class="grp">{{ g.group }}</div>
-      {% for n in g['items'] %}<a href="{{ n.href }}" class="{{ 'on' if n.key == active }}"><span>{{ n.icon }}</span> {{ n.label }}</a>{% endfor %}
+      {% for n in g['items'] %}<a href="{{ n.href }}" class="{{ 'on' if n.key == active }}{{ ' nav-ws' if n.key == 'workspace' }}"><span>{{ n.icon }}</span> {{ n.label }}</a>{% endfor %}
     {% endfor %}
     <div class="who">
       <b>{{ actor.name }}</b><br><small>{{ role_label }} · {{ plan }}{% if plan == 'TRIAL' %} ({{ trial_days }}d left){% endif %}</small>

@@ -37,3 +37,28 @@ def serial_detail(imei: str, request: Request):
         except StockError as e:
             return redirect("/app/serials", flash=e.message, error=True)
         return render(request, "serials/detail.html", actor, "serials", u=u, costs=actor.can("costs.view"))
+
+
+@router.get("/app/serial-lookup/available")
+def lookup_available(request: Request, item: str = "", godown: str = "", voucher: str = "", q: str = ""):
+    """IMEIs that can be picked for a sales line (JSON, used by the bill form)."""
+    from fastapi.responses import JSONResponse
+
+    with session_scope() as db:
+        actor = page_actor(db, request)
+        need(actor, "sales.create")
+        return JSONResponse(serials.available(db, actor, item, godown, voucher, q))
+
+
+@router.get("/app/serial-lookup/find")
+def lookup_find(request: Request, code: str = "", godown: str = "", voucher: str = ""):
+    """POS scan: which model does this IMEI belong to (JSON)."""
+    from fastapi.responses import JSONResponse
+
+    with session_scope() as db:
+        actor = page_actor(db, request)
+        need(actor, "sales.create")
+        try:
+            return JSONResponse({"ok": True, **serials.find_for_sale(db, actor, code, godown, voucher)})
+        except StockError as e:
+            return JSONResponse({"ok": False, "error": e.message})

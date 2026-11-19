@@ -10,6 +10,9 @@
     var dark = m === "dark" || (m === "system" && mq && mq.matches);
     root.dataset.theme = dark ? "dark" : "light";
     root.dataset.accent = get("gb-accent", "blue");
+    root.dataset.ws = get("gb-workspace", "off") === "on" ? "on" : "off";
+    var wt = document.getElementById("ws-toggle");
+    if (wt) wt.checked = root.dataset.ws === "on";
     document.querySelectorAll("#mode-seg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.mode === m)); });
     document.querySelectorAll("#accent-swatches button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.accent === root.dataset.accent)); });
   }
@@ -20,6 +23,8 @@
   document.querySelectorAll("#accent-swatches button").forEach(function (b) {
     b.addEventListener("click", function () { set("gb-accent", b.dataset.accent); apply(); });
   });
+  var wsT = document.getElementById("ws-toggle");
+  if (wsT) wsT.addEventListener("change", function () { set("gb-workspace", wsT.checked ? "on" : "off"); apply(); });
   var t = document.getElementById("theme-toggle");
   if (t) t.addEventListener("click", function () { set("gb-mode", root.dataset.theme === "dark" ? "light" : "dark"); apply(); });
   if (mq && mq.addEventListener) mq.addEventListener("change", apply);

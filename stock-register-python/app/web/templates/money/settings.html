@@ -11,6 +11,11 @@
       {% for k, label in [('blue','Blue'),('green','Green'),('purple','Purple'),('orange','Orange'),('rose','Rose')] %}<button type="button" class="sw sw-{{ k }}" data-accent="{{ k }}" title="{{ label }}" aria-label="{{ label }}"></button>{% endfor %}</div></div>
   </div>
 </div>
+<div class="card" id="workspace-setting"><h2 style="margin-top:0">Multi-tab workspace</h2>
+  <p class="muted">Keep several pages open as tabs, for example a half-made bill and a customer's ledger side by side. Saved on this device only.</p>
+  <label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="ws-toggle" style="width:auto;margin:0"> Enable the multi-tab workspace (adds it to the menu)</label>
+  <p><a class="btn ghost sm" href="/app/workspace">Open the workspace</a></p>
+</div>
 <h2>Business</h2>
 <form method="post" action="/app/settings" class="card">
 <div class="row"><label>Business name<input name="businessName" value="{{ profile.businessName }}"></label>
