@@ -1,12 +1,16 @@
-# GodownBook (Python): app + Caddy (HTTPS) for https://godown.ajmalaji.tech
-#   1. cp .env.production.example .env.production   (fill it in)
-#   2. docker compose up -d --build
+# GodownBook: the part every environment shares (the app container and its database volume).
+# Add ONE environment file on top of this one:
+#   live (Traefik):  docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
+#   this computer:   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+#   own HTTPS (Caddy): docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+# (or set COMPOSE_FILE=docker-compose.yml:docker-compose.traefik.yml in a .env file and just run `docker compose up -d --build`)
 services:
   app:
     build: .
     image: godownbook-py:latest
+    container_name: godownbook-py-app
     restart: unless-stopped
-    env_file: .env.production
+    # env_file (secrets) is set by each environment file, never here.
     environment:
       APP_ENV: production
       DATABASE_URL: file:/data/godownbook.db
@@ -16,23 +20,5 @@ services:
     expose:
       - "8000"
 
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    depends_on:
-      - app
-    environment:
-      DOMAIN: ${DOMAIN:-godown.ajmalaji.tech}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-
 volumes:
   db-data: # the SQLite database: back this up
-  caddy-data: # HTTPS certificates
-  caddy-config:

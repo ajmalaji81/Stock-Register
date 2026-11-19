@@ -1,23 +1,9 @@
-# GodownBook (Python) on a server that ALREADY runs Traefik on ports 80/443 (e.g. Hostinger's Docker VPS image).
-# Traefik routes https://godown.ajmalaji.tech to this container and gets the Let's Encrypt certificate itself
-# (resolver "letsencrypt", entrypoint "websecure"). No Caddy here.
-#
-#   docker compose -f docker-compose.traefik.yml up -d --build
+# LIVE: https://godown.ajmalaji.tech on a server that already runs Traefik on ports 80/443.
+# Traefik routes the domain to the app and gets the Let's Encrypt certificate (resolver "letsencrypt", entrypoint "websecure").
+#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
 services:
   app:
-    build: .
-    image: godownbook-py:latest
-    container_name: godownbook-py-app
-    restart: unless-stopped
     env_file: .env.production
-    environment:
-      APP_ENV: production
-      DATABASE_URL: file:/data/godownbook.db
-      APP_URL: https://${DOMAIN:-godown.ajmalaji.tech}
-    volumes:
-      - db-data:/data
-    expose:
-      - "8000"
     labels:
       - traefik.enable=true
       - traefik.http.routers.godownpy.rule=Host(`${DOMAIN:-godown.ajmalaji.tech}`)
@@ -32,7 +18,3 @@ services:
       - traefik.http.middlewares.godownpy-headers.headers.referrerPolicy=strict-origin-when-cross-origin
       # Strip any country header a visitor sends so PPP pricing can't be spoofed.
       - traefik.http.middlewares.godownpy-headers.headers.customrequestheaders.X-Vercel-IPCountry=
-
-volumes:
-  db-data: # the SQLite database: back this up
-

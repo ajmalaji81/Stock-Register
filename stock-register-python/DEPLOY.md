@@ -7,10 +7,10 @@ Two containers:
 - **`app`**: FastAPI + uvicorn. Creates its tables on first start; the SQLite database lives on the `db-data` volume.
 - **`caddy`**: answers on ports 80 and 443, gets and renews the HTTPS certificate from Let's Encrypt, and forwards traffic to `app`.
 
-Files: `Dockerfile`, `docker-compose.yml`, `docker-compose.traefik.yml`, `docker/Caddyfile`, `docker/entrypoint.sh`, `.env.production.example`, `.dockerignore`.
+Files: `Dockerfile`, `docker-compose.yml` (shared base) plus one environment file on top of it: `docker-compose.traefik.yml` (live), `docker-compose.local.yml` (this computer), `docker-compose.caddy.yml` (own HTTPS), `docker/Caddyfile`, `docker/entrypoint.sh`, `.env.production.example`, `.dockerignore`.
 
-> **Server already running Traefik?** (e.g. Hostinger's Docker VPS image.) Don't start Caddy; use
-> `docker compose -f docker-compose.traefik.yml up -d --build`. Traefik finds the container through its labels
+> **Server already running Traefik?** (e.g. Hostinger's Docker VPS image.) Don't use the Caddy file; use
+> `docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build`. Traefik finds the container through its labels
 > (router `godownpy`, entrypoint `websecure`, resolver `letsencrypt`). Every other step is the same.
 
 ## 1. DNS
@@ -21,7 +21,7 @@ At the DNS provider for `ajmalaji.tech` add:
 |---|---|---|---|
 | A | `godown` | your server's IPv4 address | Auto / 300 |
 
-Check: `nslookup godown.ajmalaji.tech` must print the server's IP before you start Caddy.
+Check: `nslookup godown.ajmalaji.tech` must print the server's IP before you start the stack.
 (Cloudflare: use **DNS only**, grey cloud, for the first start so the certificate can be issued.)
 
 ## 2. Server
@@ -40,6 +40,8 @@ sudo ufw allow 80,443/tcp && sudo ufw allow 443/udp
 git clone <your repo> && cd stock-register-python
 cp .env.production.example .env.production
 openssl rand -hex 32                 # paste the result as AUTH_SECRET in .env.production
+# pick ONE: Traefik server -> traefik.yml, plain server -> caddy.yml
+export COMPOSE_FILE=docker-compose.yml:docker-compose.traefik.yml   # or docker-compose.caddy.yml
 docker compose up -d --build
 docker compose logs -f app           # "Starting GodownBook on port 8000"
 ```
@@ -100,3 +102,14 @@ SMTP_FROM=you@gmail.com
 
 Gmail needs an **App Password** (Google Account -> Security -> 2-Step Verification -> App passwords), not your normal password.
 Without `SMTP_HOST` the link is written to the app log instead of being emailed.
+
+## Running it on your own computer
+
+```bash
+cp .env.example .env        # fill AUTH_SECRET (32+ chars); use Dodo test_mode keys
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
+Opens at http://localhost:8080. Local and live are separate installs: each has its own database, its own `AUTH_SECRET`
+(so logins and invoice share links don't carry over), its own Dodo mode, and the browser keeps its own
+light/dark, colour and "Multi-tab workspace" choices per web address.

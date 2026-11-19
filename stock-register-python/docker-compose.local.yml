@@ -1,21 +1,16 @@
-# GodownBook on this computer (no domain / HTTPS): docker compose -f docker-compose.local.yml up -d
-# Opens at http://localhost:8080. Uses the existing "godownbook-demo-data" volume (created with the demo data).
+# THIS COMPUTER: http://localhost:8080 (no domain, no HTTPS). Uses ./.env (copy .env.example) for secrets.
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+# Data lives in the "godownbook-demo-data" volume (created on first start; load demo data into it if you want it).
 services:
   app:
-    image: godownbook-py:demo
-    build: .
+    image: godownbook-py:local
     container_name: godownbook-demo
-    restart: unless-stopped
     env_file: .env
     environment:
-      APP_ENV: production
-      DATABASE_URL: file:/data/godownbook.db
       APP_URL: http://localhost:8080
     ports:
       - "8080:8000"
-    volumes:
-      - godownbook-demo-data:/data
 
 volumes:
-  godownbook-demo-data:
-    external: true
+  db-data:
+    name: godownbook-demo-data

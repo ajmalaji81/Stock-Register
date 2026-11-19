@@ -1,0 +1,25 @@
+# OWN HTTPS with Caddy (a server with nothing else on ports 80/443). Needs .env.production and DNS pointing at the server.
+#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+services:
+  app:
+    env_file: .env.production
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMAIN: ${DOMAIN:-godown.ajmalaji.tech}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  caddy-data: # HTTPS certificates
+  caddy-config:
