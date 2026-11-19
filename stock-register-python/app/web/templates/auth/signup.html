@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Sign up — GodownBook{% endblock %}
+{% from "_logo.html" import logo %}
+{% block public %}
+<div class="auth-wrap"><div class="auth-card card pop-in">
+  {{ logo("/", 38) }}
+  <h1>Create your book</h1>
+  <p class="muted">90 days of every Pro feature, free. No card.</p>
+  {% if error %}<div class="flash err" style="margin:0 0 10px">{{ error }}</div>{% endif %}
+  <form method="post" action="/signup">
+    <label>Your name<input name="name" value="{{ form_name }}" required autofocus></label>
+    <label>Email<input type="email" name="email" value="{{ email }}" required></label>
+    <label>Password (8+ characters)<input type="password" name="password" minlength="8" required></label>
+    <button class="btn" type="submit" style="width:100%;margin-top:6px">Sign up</button>
+  </form>
+  <p class="muted">Already have an account? <a href="/login">Log in</a></p>
+</div></div>
+{% endblock %}

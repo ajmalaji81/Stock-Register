@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}IMEI tracking · GodownBook{% endblock %}
+{% block content %}
+<h1>IMEI / serial tracking</h1>
+<p class="muted">Search any phone by IMEI to see where it was bought from, where it is now and when it was last sold. IMEIs are entered on purchase, sales and transfer screens.</p>
+{% if mismatches %}<div class="flash err" style="margin:0 0 14px"><b>Stock and IMEI counts differ</b> for:
+  {% for m in mismatches %}{{ m.item }} at {{ m.godown }} (stock {{ m.stock|qty }}, IMEIs {{ m.units }}){{ '; ' if not loop.last }}{% endfor %}.
+  Use purchase / sales / transfer bills (not manual stock entries or adjustments) for IMEI-tracked phones.</div>{% endif %}
+<form class="card row" method="get">
+  <label>IMEI<input name="q" value="{{ q }}" placeholder="Full or last digits" autofocus></label>
+  <label>Item<select name="item" data-search><option value="">All phones</option>{% for i in tracked %}<option value="{{ i.id }}" {{ 'selected' if i.id == item }}>{{ i.name }}</option>{% endfor %}</select></label>
+  <label>Shop / godown<select name="godown"><option value="">All</option>{% for g in ws.godowns %}<option value="{{ g.id }}" {{ 'selected' if g.id == godown }}>{{ g.name }}</option>{% endfor %}</select></label>
+  <label>Status<select name="status"><option value="">Any</option>{% for k, v in statuses.items() if k != 'VOID' %}<option value="{{ k }}" {{ 'selected' if k == status_f }}>{{ v }}</option>{% endfor %}</select></label>
+  <button class="btn">Search</button>
+</form>
+<div class="card"><table>
+  <tr><th>IMEI</th><th>Model</th><th>Status</th><th>Now at</th><th>Origin (purchased)</th><th>Last sold</th></tr>
+  {% for r in rows %}<tr>
+    <td><a href="/app/serials/{{ r.imei }}"><b>{{ r.imei }}</b></a>{% if r.imei2 %}<br><small class="muted">{{ r.imei2 }}</small>{% endif %}</td>
+    <td>{{ r.item }}</td>
+    <td><span class="badge {{ 'out' if r.status == 'SOLD' }}">{{ r.statusLabel }}</span>{% if r.moves %}<br><small class="muted">{{ r.moves }} transfer{{ 's' if r.moves > 1 }}</small>{% endif %}</td>
+    <td>{{ r.godown }}</td>
+    <td>{% if r.origin %}{{ r.origin.party }}<br><small class="muted">{{ r.origin.date }} · {{ r.origin.number }}</small>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td>{% if r.lastSale %}{{ r.lastSale.party }}<br><small class="muted">{{ r.lastSale.date }} · {{ r.lastSale.number }}</small>{% else %}<span class="muted">Not sold</span>{% endif %}</td>
+  </tr>{% else %}<tr><td colspan="6" class="muted">No IMEIs found.</td></tr>{% endfor %}
+</table>{% if rows %}<p class="muted">{{ rows|length }} shown</p>{% endif %}</div>
+{% endblock %}

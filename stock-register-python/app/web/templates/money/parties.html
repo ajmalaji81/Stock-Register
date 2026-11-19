@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% from "money/_party_form.html" import fields with context %}
+{% block title %}Parties - GodownBook{% endblock %}
+{% block content %}
+<h1>Parties</h1>
+<div class="grid">
+  <div class="card stat">To receive<b class="in">{{ data.totals.receivable|inr }}</b></div>
+  <div class="card stat">To pay<b class="out">{{ data.totals.payable|inr }}</b></div>
+</div>
+<form class="card row" method="get">
+  <label>Search<input name="q" value="{{ q }}" placeholder="name, phone, GSTIN"></label>
+  <label>Type<select name="type"><option value="">All</option>{% for t in ['CUSTOMER','SUPPLIER','BOTH'] %}<option {{ 'selected' if type == t }}>{{ t }}</option>{% endfor %}</select></label>
+  <label>Sort<select name="sort"><option value="">Name</option><option value="balance_desc" {{ 'selected' if sort == 'balance_desc' }}>Balance high to low</option><option value="balance_asc" {{ 'selected' if sort == 'balance_asc' }}>Balance low to high</option></select></label>
+  <button class="btn">Filter</button>
+</form>
+{% if can(actor, 'parties.manage') %}
+<details class="card"><summary>Add party</summary>
+<form method="post" action="/app/parties">{{ fields() }}<button class="btn">Add party</button></form></details>
+{% endif %}
+<div class="card"><table>
+<tr><th>Name</th><th>Type</th><th>Phone</th><th class="n">Balance</th></tr>
+{% for p in data.parties %}
+<tr><td><a href="/app/parties/{{ p.id }}">{{ p.name }}</a></td><td><span class="badge">{{ p.type }}</span></td><td>{{ p.phone }}</td>
+<td class="n {{ 'in' if p.balance > 0 else 'out' if p.balance < 0 }}">{{ p.balance|abs|inr }} {{ 'Dr' if p.balance > 0 else 'Cr' if p.balance < 0 }}</td></tr>
+{% else %}<tr><td colspan="4" class="muted">No parties yet.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Settings - GodownBook{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<div class="card" id="appearance"><h2 style="margin-top:0">Appearance</h2>
+  <p class="muted">Saved on this device only.</p>
+  <div class="row" style="align-items:flex-start">
+    <div><b>Mode</b><div class="seg" id="mode-seg" role="radiogroup" aria-label="Colour mode">
+      <button type="button" data-mode="light">☀ Light</button><button type="button" data-mode="dark">☾ Dark</button><button type="button" data-mode="system">⌬ System</button></div></div>
+    <div><b>Colour theme</b><div class="swatches" id="accent-swatches" role="radiogroup" aria-label="Colour theme">
+      {% for k, label in [('blue','Blue'),('green','Green'),('purple','Purple'),('orange','Orange'),('rose','Rose')] %}<button type="button" class="sw sw-{{ k }}" data-accent="{{ k }}" title="{{ label }}" aria-label="{{ label }}"></button>{% endfor %}</div></div>
+  </div>
+</div>
+<h2>Business</h2>
+<form method="post" action="/app/settings" class="card">
+<div class="row"><label>Business name<input name="businessName" value="{{ profile.businessName }}"></label>
+<label>GSTIN<input name="gstin" value="{{ profile.gstin }}" maxlength="15"></label>
+<label>Phone<input name="phone" value="{{ profile.phone }}"></label></div>
+<div class="row"><label>State (decides CGST+SGST vs IGST)<select name="state"><option value=""></option>{% for s in states %}<option {{ 'selected' if s == profile.state }}>{{ s }}</option>{% endfor %}</select></label>
+<label>Invoice prefix<input name="invoicePrefix" value="{{ profile.invoicePrefix }}" maxlength="10"></label></div>
+<label>Address<textarea name="address" rows="2">{{ profile.address }}</textarea></label>
+<label>Invoice terms<textarea name="invoiceTerms" rows="3">{{ profile.invoiceTerms }}</textarea></label>
+<label>Bank details<textarea name="bankDetails" rows="3">{{ profile.bankDetails }}</textarea></label>
+<button class="btn">Save settings</button></form>
+{% endblock %}

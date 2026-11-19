@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% from "money/_party_form.html" import fields, pay_form with context %}
+{% block title %}{{ p.name }} - GodownBook{% endblock %}
+{% block content %}
+<p><a href="/app/parties">&larr; Parties</a></p>
+<h1>{{ p.name }} <span class="badge">{{ p.type }}</span></h1>
+<div class="grid">
+  <div class="card stat">Balance<b class="{{ 'in' if p.balance > 0 else 'out' if p.balance < 0 }}">{{ p.balance|abs|inr }} {{ 'to receive' if p.balance > 0 else 'to pay' if p.balance < 0 }}</b></div>
+  <div class="card stat">Sales<b>{{ p.sales|inr }}</b></div>
+  <div class="card stat">Purchases<b>{{ p.purchases|inr }}</b></div>
+</div>
+{% if p.reminderLink %}<p><a class="btn" href="{{ p.reminderLink }}" target="_blank" rel="noopener">WhatsApp reminder</a></p>{% endif %}
+{% if can(actor, 'payments.manage') %}<div class="card"><h2>Record payment</h2>{{ pay_form(p.id, modes, today) }}</div>{% endif %}
+<div class="card"><h2>Ledger</h2>
+<form class="row" method="get"><label>From<input type="date" name="frm" value="{{ frm }}"></label><label>To<input type="date" name="to" value="{{ to }}"></label>
+<button class="btn">Apply</button><a class="btn ghost" href="/app/parties/{{ p.id }}/ledger.csv?frm={{ frm }}&to={{ to }}">CSV</a></form>
+<table><tr><th>Date</th><th>Particulars</th><th class="n">Debit</th><th class="n">Credit</th><th class="n">Balance</th></tr>
+{% for r in ledger.rows %}<tr><td>{{ r.date }}</td><td>{{ r.ref }}</td><td class="n">{{ r.debit|inr if r.debit }}</td><td class="n">{{ r.credit|inr if r.credit }}</td><td class="n">{{ r.balance|inr }}</td></tr>
+{% else %}<tr><td colspan="5" class="muted">No entries.</td></tr>{% endfor %}
+</table><p>Closing: <b>{{ ledger.closing|inr }}</b></p></div>
+{% if payments %}<div class="card"><h2>Payments</h2><table><tr><th>Date</th><th>Mode</th><th class="n">Amount</th><th>Notes</th><th></th></tr>
+{% for x in payments %}<tr><td>{{ x.date }}</td><td>{{ x.mode }}</td><td class="n {{ 'in' if x.direction == 'IN' else 'out' }}">{{ '+' if x.direction == 'IN' else '-' }}{{ x.amount|inr }}</td><td>{{ x.notes }}</td>
+<td>{% if not x.notes.startswith('Reversal of ') %}<form method="post" action="/app/payments/{{ x.id }}/reverse" class="inline"><input type="hidden" name="partyId" value="{{ p.id }}"><button class="btn ghost sm">Reverse</button></form>{% endif %}</td></tr>{% endfor %}
+</table></div>{% endif %}
+{% if can(actor, 'parties.manage') %}
+<details class="card"><summary>Edit party</summary>
+<form method="post" action="/app/parties/{{ p.id }}/update">{{ fields(p) }}<button class="btn">Save</button></form>
+<form method="post" action="/app/parties/{{ p.id }}/delete" onsubmit="return confirm('Delete this party?')"><button class="btn danger sm">Delete party</button></form></details>
+{% endif %}
+{% endblock %}

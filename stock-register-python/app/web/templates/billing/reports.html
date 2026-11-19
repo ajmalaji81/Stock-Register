@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Sales & GST — GodownBook{% endblock %}
+{% block content %}
+{% macro bars(title, data, note='') %}
+<div class="card"><h2 style="margin-top:0">{{ title }}</h2>{% if note %}<p class="muted" style="margin-top:-6px">{{ note }}</p>{% endif %}
+  {% set mx = namespace(v=0) %}{% for d in data %}{% if d.value|abs > mx.v %}{% set mx.v = d.value|abs %}{% endif %}{% endfor %}
+  {% if data %}<ul class="chart" role="list">{% for d in data %}
+    <li><span class="lbl" title="{{ d.label }}">{{ d.label }}</span>
+      <span class="track" aria-hidden="true"><span class="bar {{ 'neg' if d.value < 0 }}" style="width:{{ (d.value|abs / mx.v * 100) if mx.v else 0 }}%;display:block"></span></span>
+      <span class="val">{{ d.value|inr }}</span></li>{% endfor %}</ul>
+  {% else %}<p class="muted">No data in this range.</p>{% endif %}</div>
+{% endmacro %}
+<h1>Sales &amp; GST reports</h1>
+<form class="card row" method="get">
+  <label>Side<select name="side"><option value="sales" {{ 'selected' if side == 'sales' }}>Sales</option>{% if can_purchases %}<option value="purchases" {{ 'selected' if side == 'purchases' }}>Purchases</option>{% endif %}</select></label>
+  <label>From<input type="date" name="from" value="{{ frm }}"></label>
+  <label>To<input type="date" name="to" value="{{ to }}"></label>
+  <button class="btn">Show</button>
+  <a class="btn ghost" href="?side={{ side }}&from={{ frm }}&to={{ to }}&format=csv">Download CSV</a>
+</form>
+<div class="grid">
+  <div class="card stat"><span class="muted">Taxable</span><b>{{ rep.totals.taxable|inr }}</b></div>
+  <div class="card stat"><span class="muted">CGST / SGST / IGST</span><b>{{ rep.totals.cgst|inr }} / {{ rep.totals.sgst|inr }} / {{ rep.totals.igst|inr }}</b></div>
+  <div class="card stat"><span class="muted">Total</span><b>{{ rep.totals.total|inr }}</b></div>
+  {% if rep.profit %}<div class="card stat"><span class="muted">Profit</span><b class="{{ 'in' if rep.profit.total >= 0 else 'out' }}">{{ rep.profit.total|inr }}</b></div>{% endif %}
+</div>
+<div class="charts">
+  {{ bars('Sales by ' ~ rep.charts.timeUnit, rep.charts.byTime) }}
+  {{ bars('Top items', rep.charts.topItems, 'By taxable value') }}
+  {{ bars('Top ' ~ ('customers' if side == 'sales' else 'suppliers'), rep.charts.topParties) }}
+  {{ bars('By payment mode', rep.charts.byMode, 'Payments taken with the bill') }}
+</div>
+<div class="card"><h2>B2B vs B2C</h2><table><tr><th></th><th class="n">Bills</th><th class="n">Taxable</th><th class="n">Tax</th><th class="n">Total</th></tr>
+  {% for name, b in [('B2B (GSTIN)', rep.b2b), ('B2C', rep.b2c)] %}<tr><td>{{ name }}</td><td class="n">{{ b.count|int }}</td><td class="n">{{ b.taxable|inr }}</td><td class="n">{{ b.tax|inr }}</td><td class="n">{{ b.total|inr }}</td></tr>{% endfor %}</table></div>
+<div class="card"><h2>By GST rate</h2><table><tr><th>Rate</th><th class="n">Taxable</th><th class="n">CGST</th><th class="n">SGST</th><th class="n">IGST</th></tr>
+  {% for r in rep.byRate %}<tr><td>{{ r.rate }}%</td><td class="n">{{ r.taxable|inr }}</td><td class="n">{{ r.cgst|inr }}</td><td class="n">{{ r.sgst|inr }}</td><td class="n">{{ r.igst|inr }}</td></tr>{% else %}<tr><td colspan="5" class="muted">No data</td></tr>{% endfor %}</table></div>
+<div class="card"><h2>By HSN</h2><table><tr><th>HSN</th><th>Item</th><th class="n">Qty</th><th class="n">Taxable</th><th class="n">Tax</th></tr>
+  {% for r in rep.byHsn %}<tr><td>{{ r.hsn }}</td><td>{{ r.description }}</td><td class="n">{{ r.qty|qty }}</td><td class="n">{{ r.taxable|inr }}</td><td class="n">{{ r.tax|inr }}</td></tr>{% else %}<tr><td colspan="5" class="muted">No data</td></tr>{% endfor %}</table></div>
+<div class="card"><h2>Register</h2><table><tr><th>Date</th><th>No.</th><th>Party</th><th>GSTIN</th><th class="n">Taxable</th><th class="n">Tax</th><th class="n">Total</th></tr>
+  {% for r in rep.register %}<tr><td>{{ r.date }}</td><td><a href="/app/billing/{{ r.id }}">{{ r.number }}</a></td><td>{{ r.party }}</td><td>{{ r.gstin }}</td><td class="n">{{ r.taxable|inr }}</td><td class="n">{{ (r.cgst + r.sgst + r.igst)|inr }}</td><td class="n">{{ r.total|inr }}</td></tr>{% else %}<tr><td colspan="7" class="muted">No bills in this range.</td></tr>{% endfor %}</table></div>
+{% if rep.profit %}
+<div class="card"><h2>Profit by item</h2><table><tr><th>Item</th><th class="n">Qty</th><th class="n">Sales</th><th class="n">Cost</th><th class="n">Profit</th></tr>
+  {% for r in rep.profit.byItem %}<tr><td>{{ r.name }}</td><td class="n">{{ r.qty|qty }}</td><td class="n">{{ r.sales|inr }}</td><td class="n">{{ r.cost|inr }}</td><td class="n">{{ r.profit|inr }}</td></tr>{% endfor %}</table></div>
+<div class="card"><h2>Profit by party</h2><table><tr><th>Party</th><th class="n">Sales</th><th class="n">Cost</th><th class="n">Profit</th></tr>
+  {% for r in rep.profit.byParty %}<tr><td>{{ r.party }}</td><td class="n">{{ r.sales|inr }}</td><td class="n">{{ r.cost|inr }}</td><td class="n">{{ r.profit|inr }}</td></tr>{% endfor %}</table></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Payment received — GodownBook{% endblock %}
+{% block shell %}
+{% if not is_pro %}<meta http-equiv="refresh" content="4">{% endif %}
+<main class="center card" style="text-align:center">
+  {% if is_pro %}<h1 class="in">Lifetime Pro unlocked ✓</h1><p>Thank you! Unlimited items and godowns are now on your account.</p><a class="btn" href="/app">Open my book</a>
+  {% else %}<h1>Confirming your payment…</h1><p class="muted">This page refreshes by itself. It usually takes a few seconds.</p><a class="btn ghost" href="/app">Back to my book</a>{% endif %}
+</main>
+{% endblock %}

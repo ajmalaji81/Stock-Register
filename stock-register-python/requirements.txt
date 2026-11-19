@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic[email]
+bcrypt
+pyjwt
+jinja2
+python-multipart
+standardwebhooks
+dodopayments
+pytest
+httpx

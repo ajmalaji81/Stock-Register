@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Adjustments · GodownBook{% endblock %}
+{% block content %}
+<h1>Stock adjustments</h1>
+<div class="card"><p class="muted">Correct stock after a physical count. Enter the counted quantity, or a signed change.</p>
+<form method="post" action="/app/adjustments"><div class="row">
+ <label>Item<select name="itemId">{% for i in ws['items'] %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}</select></label>
+ <label>Godown<select name="godownId">{% for g in ws.godowns %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></label>
+ <label>Mode<select name="mode"><option value="count">New count</option><option value="delta">Change (+/−)</option></select></label>
+ <label>Value<input name="value" type="number" step="any" required></label>
+ <label>Reason<input name="reason" required minlength="2"></label>
+ <label>Date<input name="date" type="date" value="{{ today }}"></label><button class="btn">Post</button></div></form></div>
+<div class="card"><h2>History</h2><table><tr><th>Date</th><th>Item</th><th>Godown</th><th class="n">Change</th><th class="n">Balance</th><th>Reason</th><th>By</th></tr>
+{% for h in history %}<tr><td>{{ h.date }}</td><td>{{ h.itemName }}</td><td>{{ h.godownName }}</td>
+<td class="n {{ 'in' if h.delta > 0 else 'out' }}">{{ '+' if h.delta > 0 }}{{ h.delta|qty }}</td><td class="n">{{ h.balance|qty }}</td><td>{{ h.reason }}</td><td>{{ h.actorName }}</td></tr>
+{% else %}<tr><td colspan="7" class="muted">No adjustments yet.</td></tr>{% endfor %}</table></div>
+{% endblock %}

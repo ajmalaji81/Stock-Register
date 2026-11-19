@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Activity - GodownBook{% endblock %}
+{% block content %}
+<h1>Activity</h1>
+<form class="card row" method="get">
+<label>Who<select name="actorId"><option value="">Everyone</option>{% for a in data.actors %}<option value="{{ a.id }}" {{ 'selected' if a.id == actorId }}>{{ a.name }}</option>{% endfor %}</select></label>
+<label>Area<select name="action"><option value="">All</option>{% for a in areas %}<option value="{{ a }}" {{ 'selected' if a == action }}>{{ a }}</option>{% endfor %}</select></label>
+<label>From<input type="date" name="frm" value="{{ frm }}"></label><label>To<input type="date" name="to" value="{{ to }}"></label><button class="btn">Filter</button></form>
+<div class="card"><table><tr><th>When</th><th>Who</th><th>What</th><th>Detail</th></tr>
+{% for i in data['items'] %}<tr><td>{{ i.createdAt[:16].replace('T',' ') }} UTC</td><td>{{ i.actorName }}</td><td class="{{ i.tone }}">{{ i.label }}</td><td>{{ i.detail }}</td></tr>
+{% else %}<tr><td colspan="4" class="muted">Nothing yet.</td></tr>{% endfor %}</table>
+<p>Page {{ data.page }} of {{ pages }} ({{ data.total }} entries)
+{% if data.page > 1 %}<a href="?actorId={{ actorId }}&action={{ action }}&frm={{ frm }}&to={{ to }}&page={{ data.page - 1 }}">&larr; Newer</a>{% endif %}
+{% if data.page < pages %}<a href="?actorId={{ actorId }}&action={{ action }}&frm={{ frm }}&to={{ to }}&page={{ data.page + 1 }}">Older &rarr;</a>{% endif %}</p></div>
+{% endblock %}

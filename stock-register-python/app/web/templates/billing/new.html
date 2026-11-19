@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if edit else 'New' }} {{ kind_label[kind] }} — GodownBook{% endblock %}
+{% block content %}
+<h1>{% if edit %}Edit {{ kind_label[kind]|lower }} {{ edit.number }}{% else %}New {{ kind_label[kind]|lower }}{% endif %}</h1>
+{% if edit %}<p class="muted">Only the account owner can edit a bill. Stock and payments taken with the bill are re-applied with your changes; the number stays the same.</p>{% endif %}
+<form method="post" action="{{ '/app/billing/' ~ edit.id ~ '/edit' if edit else '/app/billing/new' }}" id="bill" data-business-state="{{ business_state }}">
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <div class="card row">
+    <label>Date<input type="date" name="date" value="{{ today }}" required></label>
+    <label>Godown<select name="godownId" required>{% for g in ws.godowns %}<option value="{{ g.id }}" {{ 'selected' if edit and edit.godownId == g.id }}>{{ g.name }}</option>{% endfor %}</select></label>
+    <div class="psearch">
+      <label>{{ 'Supplier' if purchase_side else 'Customer' }}
+        <input type="text" id="party-q" autocomplete="off" placeholder="Click to choose, or type name / phone{{ '' if purchase_side or kind == 'SALE_RETURN' else ' (blank = cash sale)' }}"></label>
+      <input type="hidden" name="partyId" id="party" value="{{ edit.partyId if edit and edit.partyId else '' }}">
+      <div id="party-list" class="plist" hidden></div>
+      <small class="muted" id="party-hint"></small>
+    </div>
+    <label>Place of supply<select name="placeOfSupply" id="pos"><option value="">Party's state / mine</option>{% for s in states %}<option {{ 'selected' if edit and edit.placeOfSupply == s }}>{{ s }}</option>{% endfor %}</select></label>
+    <label><input type="checkbox" name="gstEnabled" value="1" id="gst" {{ 'checked' if not edit or edit.gstEnabled }} style="display:inline;width:auto"> GST applies</label>
+  </div>
+  <div class="card">
+    <table id="lines">
+      <tr><th>Item</th><th>Description</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">Disc ₹</th><th class="n">Disc %</th><th class="n">Tax %</th><th class="n">Amount</th><th></th></tr>
+    </table>
+    <button type="button" class="btn ghost sm" id="add">+ Add line</button>
+  </div>
+  <div class="card row">
+    <label>Notes<textarea name="notes" rows="2">{{ edit.notes if edit }}</textarea></label>
+    <label>Scheme info<textarea name="schemeInfo" rows="2" maxlength="300" placeholder="e.g. Festival offer, free gift, exchange bonus">{{ edit.schemeInfo if edit }}</textarea></label>
+    <label>Payment info<textarea name="paymentInfo" rows="2" maxlength="300" placeholder="e.g. UPI ref no., cheque no., card last 4 digits">{{ edit.paymentInfo if edit }}</textarea></label>
+  </div>
+  {% if can_pay %}
+  <div class="card">
+    <h2 style="margin-top:0">{{ 'Paid now' if purchase_side else 'Payment received now' }}</h2>
+    <p class="muted" style="margin-top:-4px">Add one row per mode to split the payment (e.g. ₹5,000 card + ₹4,000 UPI + ₹1,000 cash). Choose FINANCE when a finance company pays part of the bill.</p>
+    <div id="pays"></div>
+    <div class="row" style="align-items:center">
+      <button type="button" class="btn ghost sm" id="add-pay" style="flex:0;white-space:nowrap">+ Add payment mode</button>
+      <div class="stat" style="flex:2"><span class="muted" id="pay-summary">Paid ₹0 · Balance ₹0</span></div>
+    </div>
+    <datalist id="finance-list">{% for f in finance_companies %}<option value="{{ f }}">{% endfor %}</datalist>
+  </div>
+  {% endif %}
+  <div class="card row">
+    <div class="stat"><span class="muted">Subtotal</span> <b id="t-sub">₹0</b>
+      <span class="muted" id="t-disc-label">Discount</span> <b id="t-disc">₹0</b>
+      <span class="muted" id="t-tax-label">Tax</span> <b id="t-tax">₹0</b>
+      <span class="muted">Round off</span> <b id="t-round">₹0</b>
+      <span class="muted">Total</span> <b id="t-total">₹0</b></div>
+    <button class="btn">{{ 'Save changes' if edit else 'Save ' ~ kind_label[kind]|lower }}</button>
+  </div>
+</form>
+<template id="line-tpl">
+  <tr class="line">
+    <td><select name="itemId" class="f-item" required><option value="">Choose…</option>
+      {% for i in items %}<option value="{{ i.id }}" data-price="{{ i.price }}" data-gst="{{ i.gstRate }}" data-serial="{{ 1 if i.trackSerial else 0 }}">{{ i.name }} ({{ i.sku }})</option>{% endfor %}</select>
+      <div class="serial-box" hidden><textarea name="serials" class="f-serials" rows="3" placeholder="IMEI numbers: one per line (dual SIM: IMEI1/IMEI2), or upload a .txt / .csv file"></textarea>
+        <div class="serial-bar"><label class="btn ghost sm" style="margin:0">Upload IMEI file<input type="file" class="f-sfile" accept=".txt,.csv,text/plain,text/csv" hidden></label>
+          <small class="f-scount muted"></small></div></div></td>
+    <td><input name="description" maxlength="200"></td>
+    <td><input name="qty" type="number" step="any" min="0" class="n f-qty" value="1" required></td>
+    <td><input name="rate" type="number" step="any" min="0" class="n f-rate" value="0" required></td>
+    <td><input type="number" step="any" min="0" class="n f-discamt" value="0" aria-label="Discount amount"></td>
+    <td><input name="discountPct" type="number" step="any" min="0" max="100" class="n f-disc" value="0" aria-label="Discount percent"></td>
+    <td><input name="taxRate" type="number" step="any" min="0" max="100" class="n f-tax" value="0"></td>
+    <td class="n f-amt">₹0</td>
+    <td><button type="button" class="btn ghost sm f-del">✕</button></td>
+  </tr>
+</template>
+<template id="pay-tpl">
+  <div class="row pay">
+    <label>Mode<select name="payMode" class="p-mode">{% for m in pay_modes %}<option>{{ m }}</option>{% endfor %}</select></label>
+    <label>Amount<input type="number" step="0.01" min="0" name="payAmount" class="p-amt" value="0"></label>
+    <label class="p-fin">Finance company<input name="payFinance" class="p-fin-in" list="finance-list" maxlength="60" placeholder="Choose or type, e.g. Bajaj"></label>
+    <button type="button" class="btn ghost sm p-del" style="flex:0">✕</button>
+  </div>
+</template>
+<script type="application/json" id="parties-data">{{ parties|tojson }}</script>
+<script type="application/json" id="edit-lines">{{ edit_lines|tojson }}</script>
+<script type="application/json" id="edit-pays">{{ (edit.paymentSplit if edit else [])|tojson }}</script>
+<script src="/static/billing.js"></script>
+{% endblock %}

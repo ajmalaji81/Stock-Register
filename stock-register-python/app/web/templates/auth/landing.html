@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "_logo.html" import logo %}
+{% block title %}GodownBook — stock, GST billing and khata{% endblock %}
+{% block shell %}
+{# Isometric crate: top diamond half-width 26, half-height 14, side height 26 (viewBox 64). #}
+{% set cells = [(0,0,0,'g'),(1,0,0,'k'),(0,1,0,'g'),(1,1,0,'g'),(2,0,0,'g'),(0,2,0,'k'),(0,0,1,'k'),(1,0,1,'g'),(0,1,1,'g'),(1,1,1,'k'),(0,0,2,'g'),(2,1,0,'k'),(1,2,0,'g')] %}
+<header class="pub-head">
+  {{ logo("/", 36) }}
+  <nav><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a>
+  {% if signed_in %}<a class="btn sm" href="/app">Open my book</a>{% else %}<a href="/login">Log in</a><a class="btn sm" href="/signup">Start free</a>{% endif %}</nav>
+</header>
+<main class="pub">
+  <section class="hero">
+    <div>
+      <span class="badge">Made for Indian shops, godowns &amp; small warehouses</span>
+      <h1>Stock, GST billing and <em>khata</em> in one book.</h1>
+      <p class="muted">Multi-godown stock, GST bills, parties and payments, staff roles and an activity log. 90 days of every Pro feature, free. No card.</p>
+      <div class="cta">
+        <a class="btn" href="{{ '/app' if signed_in else '/signup' }}">{{ 'Open my book' if signed_in else 'Start free' }}</a>
+        <a class="btn ghost" href="#features">See what's inside</a>
+      </div>
+    </div>
+    <div class="scene" aria-hidden="true">
+      <svg viewBox="0 0 420 330">
+        <defs>
+          <linearGradient id="gt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#bbf7d0"/><stop offset="1" stop-color="#4ade80"/></linearGradient>
+          <linearGradient id="gl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22c55e"/><stop offset="1" stop-color="#15803d"/></linearGradient>
+          <linearGradient id="gr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#15803d"/><stop offset="1" stop-color="#0b4a25"/></linearGradient>
+          <linearGradient id="kt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4b5a50"/><stop offset="1" stop-color="#27322b"/></linearGradient>
+          <linearGradient id="kl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b372f"/><stop offset="1" stop-color="#151c17"/></linearGradient>
+          <linearGradient id="kr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#18201b"/><stop offset="1" stop-color="#090c0a"/></linearGradient>
+          <symbol id="crate-g" viewBox="0 0 64 64"><path d="M32 5 L58 19 L32 33 L6 19 Z" fill="url(#gt)"/><path d="M6 19 L32 33 L32 59 L6 45 Z" fill="url(#gl)"/><path d="M58 19 L32 33 L32 59 L58 45 Z" fill="url(#gr)"/><path d="M32 5 L58 19 L32 33 L6 19 Z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.2" stroke-linejoin="round"/><path d="M19 12 L45 26 L45 32 L19 18 Z" fill="#fff" opacity=".5"/><g stroke="#dcfce7" stroke-width="2.4" stroke-linecap="round"><path d="M12 31 L26 38.6"/><path d="M12 37.5 L26 45.1"/></g></symbol>
+          <symbol id="crate-k" viewBox="0 0 64 64"><path d="M32 5 L58 19 L32 33 L6 19 Z" fill="url(#kt)"/><path d="M6 19 L32 33 L32 59 L6 45 Z" fill="url(#kl)"/><path d="M58 19 L32 33 L32 59 L58 45 Z" fill="url(#kr)"/><path d="M32 5 L58 19 L32 33 L6 19 Z" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="1.2" stroke-linejoin="round"/><path d="M19 12 L45 26 L45 32 L19 18 Z" fill="#fff" opacity=".18"/><g stroke="#4ade80" stroke-width="2.4" stroke-linecap="round"><path d="M12 31 L26 38.6"/><path d="M12 37.5 L26 45.1"/></g></symbol>
+        </defs>
+        <ellipse cx="210" cy="272" rx="150" ry="34" fill="#0b0f0c" opacity=".1"/>
+        {% for depth in range(0, 6) %}{% for level in range(0, 3) %}{% for i, j, k, c in cells if (i + j) == depth and k == level %}
+          <g class="{{ ['fl','fl2','fl3'][(i + j + k) % 3] if k == 2 else '' }}">
+            <use href="#crate-{{ c }}" x="{{ 150 + (i - j) * 52 }}" y="{{ 150 + (i + j) * 28 - k * 52 }}" width="128" height="128"/>
+          </g>
+        {% endfor %}{% endfor %}{% endfor %}
+      </svg>
+      <span class="chip a"><i class="in">▲</i> Stock in ₹1,24,500</span>
+      <span class="chip b">GST invoice <i class="in">✓</i></span>
+    </div>
+  </section>
+
+  <section id="features"><h2>Everything a godown needs</h2>
+    <div class="grid">{% set icons = ['📦','🧾','👥','🏬','🧑‍💼','📊','⚖','🕒'] %}
+      {% for t, d in features %}<div class="card feature tilt"><span class="icon-tile">{{ icons[loop.index0 % icons|length] }}</span><br><b>{{ t }}</b><p class="muted">{{ d }}</p></div>{% endfor %}
+    </div>
+  </section>
+  <section id="pricing"><h2>Pricing</h2>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+      <div class="card tilt"><b>Free</b><div class="stat"><b>$0</b></div><ul>{% for f in free_features %}<li>{{ f }}</li>{% endfor %}</ul></div>
+      <div class="card tilt" style="border-color:var(--brand)"><b>Lifetime Pro</b>
+        <div class="stat"><b>{{ price.amount }}</b>{% if price.discountPct %}<span class="badge">{{ price.discountPct }}% off for your region (was {{ price.base }})</span>{% endif %}</div>
+        <ul>{% for f in pro_features %}<li>{{ f }}</li>{% endfor %}</ul></div>
+    </div>
+  </section>
+  <section id="faq"><h2>Questions</h2>
+    {% for q, a in faq %}<details class="card"><summary>{{ q }}</summary><p>{{ a }}</p></details>{% endfor %}
+  </section>
+</main>
+{% endblock %}

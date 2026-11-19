@@ -1,0 +1,54 @@
+{% from "_logo.html" import logo %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#16a34a">
+  <script>(function(){try{var m=localStorage.getItem('gb-mode')||'light',a=localStorage.getItem('gb-accent')||'blue';var d=m==='dark'||(m==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';document.documentElement.dataset.accent=a;}catch(e){}})();</script>
+  <script>if(window.self!==window.top){document.documentElement.classList.add('embedded');}</script>
+  <script src="/static/combo.js"></script>
+  <title>{% block title %}GodownBook{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+{% block shell %}
+{% if actor %}
+<div class="shell">
+  <aside class="side print-hide">
+    {{ logo("/app", 32) }}
+    {% for g in nav %}
+      <div class="grp">{{ g.group }}</div>
+      {% for n in g['items'] %}<a href="{{ n.href }}" class="{{ 'on' if n.key == active }}"><span>{{ n.icon }}</span> {{ n.label }}</a>{% endfor %}
+    {% endfor %}
+    <div class="who">
+      <b>{{ actor.name }}</b><br><small>{{ role_label }} · {{ plan }}{% if plan == 'TRIAL' %} ({{ trial_days }}d left){% endif %}</small>
+      {% if plan != 'PRO' and actor.can('billing.upgrade') %}<br><a href="/upgrade">Upgrade to Pro</a>{% endif %}
+      <form method="post" action="/logout"><button class="btn ghost sm">Log out</button></form>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="topbar print-hide">
+      <form method="get" action="/app/billing/sales" class="tsearch"><input type="search" name="q" placeholder="Search invoice, party or notes" aria-label="Search invoices"></form>
+      <button type="button" class="themebtn" id="theme-toggle" title="Switch light / dark" aria-label="Switch light or dark mode">◐</button>
+      <div class="tuser">{% if actor.avatar %}<img src="{{ actor.avatar }}" alt="">{% else %}<span class="av">{{ actor.name[:1]|upper }}</span>{% endif %}
+        <div><b>{{ actor.name }}</b><small>{{ actor.email }}</small></div></div>
+    </header>
+    <div class="main-body">
+    {% if flash %}<div class="flash {{ 'err' if flash.error }}">{{ flash.text }}</div>{% endif %}
+    {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+{% else %}
+  {% if flash %}<div class="flash {{ 'err' if flash.error }}" style="max-width:1060px;margin:14px auto">{{ flash.text }}</div>{% endif %}
+  <script>if(window.self!==window.top){window.top.location.href=window.location.href;}</script>
+  {% block public %}{% endblock %}
+{% endif %}
+{% endblock %}
+<script src="/static/theme.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Bulk import · GodownBook{% endblock %}
+{% block content %}
+<h1>Bulk import</h1>
+<div class="card">
+<p>Import <a href="/app/import?kind=items">items</a> or <a href="/app/import?kind=parties">parties</a> from a CSV file, or paste rows copied from Excel.
+ Template: <a href="/app/import/template/{{ kind }}.csv">{{ kind }}-template.csv</a></p>
+<form method="post" action="/app/import/preview" enctype="multipart/form-data">
+ <input type="hidden" name="kind" value="{{ kind }}">
+ <label>CSV file<input type="file" name="file" accept=".csv,.tsv,.txt"></label>
+ <label>…or paste here<textarea name="text" rows="6">{{ text }}</textarea></label>
+ <button class="btn">Preview</button></form></div>
+{% if preview %}{% set res = preview.result %}
+<div class="card"><h2>Preview</h2>
+{% for e in res.header_errors %}<div class="flash err">{{ e }}</div>{% endfor %}
+{% if res.ignored %}<p class="muted">Ignored columns: {{ res.ignored|join(', ') }}</p>{% endif %}
+{% if res.rows %}<p><b class="in">{{ preview.ok }}</b> ready, <b class="out">{{ preview.bad }}</b> with errors (skipped).</p>
+<table><tr><th>Line</th><th>Name</th>{% if kind == 'items' %}<th>SKU</th><th class="n">Opening</th>{% else %}<th>Type</th><th class="n">Balance</th>{% endif %}<th>Problems</th></tr>
+{% for r in res.rows %}<tr><td>{{ r.line }}</td><td>{{ r.data.name }}</td>
+{% if kind == 'items' %}<td>{{ r.data.sku }}</td><td class="n">{{ r.data.openingQty|qty }}</td>{% else %}<td>{{ r.data.type }}</td><td class="n">{{ r.data.openingBalance|inr }}</td>{% endif %}
+<td class="out">{{ r.errors|join('; ') }}</td></tr>{% endfor %}</table>
+{% if preview.ok %}<form method="post" action="/app/import/commit" style="margin-top:12px"><input type="hidden" name="kind" value="{{ kind }}">
+ <textarea name="text" hidden>{{ text }}</textarea><button class="btn">Import {{ preview.ok }} {{ kind }}</button></form>{% endif %}{% endif %}
+</div>{% endif %}
+{% endblock %}

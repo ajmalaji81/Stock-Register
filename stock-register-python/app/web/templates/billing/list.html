@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — GodownBook{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<div class="row" style="margin-bottom:12px">
+  {% for k in creatable %}<a class="btn" href="/app/billing/new?kind={{ k }}">+ {{ kind_label[k] }}</a>{% endfor %}
+</div>
+<form class="card row" method="get">
+  <label>Type<select name="kind"><option value="">All</option>{% for k in visible %}<option value="{{ k }}" {{ 'selected' if k == kind }}>{{ kind_label[k] }}</option>{% endfor %}</select></label>
+  <label>Status<select name="status"><option value="">Any</option>{% for s in statuses %}<option {{ 'selected' if s == status_f }}>{{ s }}</option>{% endfor %}</select></label>
+  <label>From<input type="date" name="from" value="{{ frm }}"></label>
+  <label>To<input type="date" name="to" value="{{ to }}"></label>
+  <label>Search<input name="q" value="{{ q }}" placeholder="Number, party, notes"></label>
+  <button class="btn">Filter</button>
+</form>
+<div class="card">
+  <table>
+    <tr><th>Date</th><th>Number</th><th>Type</th><th>Party</th><th>By</th><th class="n">Total</th><th class="n">Paid</th><th>By</th><th>Status</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.date }}</td>
+      <td><a href="/app/billing/{{ r.id }}">{{ r.number }}</a>{% if r.sourceNumber %}<br><small class="muted">from {{ r.sourceNumber }}</small>{% endif %}</td>
+      <td>{{ kind_label[r.kind] }}</td><td>{{ r.partyName }}</td><td>{{ r.createdBy }}{% if r.modifiedBy %}<br><small class="muted">edited by {{ r.modifiedBy }}</small>{% endif %}</td>
+      <td class="n">{{ r.total|inr }}</td><td class="n">{{ r.paid|inr }}</td>
+      <td>{{ r.createdBy }}{% if r.modifiedBy %}<br><small class="muted">edited by {{ r.modifiedBy }}</small>{% endif %}</td>
+      <td><span class="badge {{ 'out' if r.status == 'CANCELLED' }}">{{ r.status }}</span></td>
+    </tr>
+    {% else %}<tr><td colspan="8" class="muted">Nothing here yet.</td></tr>{% endfor %}
+  </table>
+  {% if rows %}<p class="muted">{{ rows|length }} shown · net total {{ total|inr }}</p>{% endif %}
+</div>
+{% endblock %}

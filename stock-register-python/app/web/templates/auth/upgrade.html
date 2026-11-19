@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Upgrade — GodownBook{% endblock %}
+{% block shell %}
+<main style="max-width:760px;margin:0 auto;padding:20px 14px">
+  {% if flash %}<div class="flash {{ 'err' if flash.error }}" style="margin:0 0 10px">{{ flash.text }}</div>{% endif %}
+  <p><a href="{{ '/app' if actor else '/' }}">← Back</a></p>
+  {% if is_pro %}
+    <div class="card" style="text-align:center"><h1 class="in">You have Lifetime Pro ✓</h1><p>Unlimited items and godowns are unlocked on your account.</p><a class="btn" href="/app">Open my book</a></div>
+  {% else %}
+    {% if actor and plan == 'TRIAL' %}<p class="card in">Your free Pro trial has {{ trial_days }} days left. Buy Lifetime Pro to keep unlimited items and godowns after it ends.</p>{% endif %}
+    {% if actor and plan == 'FREE' and actor.owner.trialEndsAt %}<p class="card low">Your 90-day Pro trial has ended. Your data is safe; new items and godowns are limited to the Free plan.</p>{% endif %}
+    <h1>Unlock unlimited stock, once and for all.</h1>
+    <p class="muted">One payment. No monthly fees. Secure checkout by Dodo Payments.</p>
+    <div class="grid">
+      <div class="card"><b>Free</b><div class="stat"><b>$0</b></div><ul>{% for f in free_features %}<li>{{ f }}</li>{% endfor %}</ul>
+        <a class="btn ghost" href="{{ '/app' if actor else '/signup' }}">{{ 'Stay on Free' if actor else 'Start free' }}</a></div>
+      <div class="card"><b>Lifetime Pro</b>
+        <div class="stat"><b>{{ price.amount }}</b>{% if price.discountPct %}<span class="badge">{{ price.discountPct }}% off (was {{ price.base }})</span>{% endif %}</div>
+        <ul>{% for f in pro_features %}<li>{{ f }}</li>{% endfor %}</ul>
+        {% if actor and can_buy %}<form method="post" action="/upgrade/checkout"><button class="btn" type="submit">Get Lifetime Pro</button></form>
+        {% elif actor %}<p class="muted">Only the account owner can buy Lifetime Pro.</p>
+        {% else %}<a class="btn" href="/signup">Sign up to upgrade</a>{% endif %}</div>
+    </div>
+  {% endif %}
+</main>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ u.imei }} · IMEI · GodownBook{% endblock %}
+{% block content %}
+<p><a href="/app/serials">← IMEI tracking</a></p>
+<h1>{{ u.imei }} <span class="badge {{ 'out' if u.status == 'SOLD' }}">{{ u.statusLabel }}</span></h1>
+<p class="muted">{{ u.item }}{% if u.imei2 %} · SIM 2: {{ u.imei2 }}{% endif %} · now at <b>{{ u.godown }}</b></p>
+<div class="grid">
+  <div class="card stat"><span class="muted">Origin (first purchase)</span>
+    {% if u.origin %}<b style="font-size:1.1rem">{{ u.origin.party }}</b><small>{{ u.origin.date }} · <a href="/app/billing/{{ u.origin.voucherId }}">{{ u.origin.number }}</a> · into {{ u.origin.godown }}{% if costs and u.origin.rate is not none %} · cost {{ u.origin.rate|inr }}{% endif %}</small>
+    {% else %}<b style="font-size:1.1rem">Not recorded</b>{% endif %}</div>
+  <div class="card stat"><span class="muted">Last sold</span>
+    {% if u.lastSale %}<b style="font-size:1.1rem">{{ u.lastSale.party }}</b><small>{{ u.lastSale.date }} · <a href="/app/billing/{{ u.lastSale.voucherId }}">{{ u.lastSale.number }}</a> · from {{ u.lastSale.godown }} · {{ u.lastSale.rate|inr }}</small>
+    {% else %}<b style="font-size:1.1rem">Not sold yet</b>{% endif %}</div>
+</div>
+<div class="card"><h2 style="margin-top:0">Full history</h2>
+<table><tr><th>Date</th><th>What happened</th><th>Where</th><th>Party</th><th>Bill</th><th>By</th></tr>
+{% for e in u.events %}<tr {% if e.voided %}style="opacity:.55;text-decoration:line-through"{% endif %}>
+  <td>{{ e.date }}</td><td>{{ e.label }}{% if e.voided %} <small>(cancelled / edited)</small>{% endif %}</td>
+  <td>{% if e.type == 'TRANSFER' %}{{ e.from }} → {{ e.to }}{% elif e.type in ('PURCHASE', 'SALE_RETURN') %}into {{ e.to }}{% else %}from {{ e.from }}{% endif %}</td>
+  <td>{{ e.party }}</td><td>{% if e.voucherId %}<a href="/app/billing/{{ e.voucherId }}">{{ e.number }}</a>{% else %}{{ e.note or '—' }}{% endif %}</td><td>{{ e.by }}</td></tr>
+{% endfor %}</table></div>
+{% endblock %}

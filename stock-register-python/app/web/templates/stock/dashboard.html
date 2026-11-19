@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · GodownBook{% endblock %}
+{% block content %}
+<div class="card welcome" id="welcome">
+  <div><h1 style="margin:0 0 2px">Welcome back, {{ actor.name.split(' ')[0] }} 👋</h1>
+    <span class="muted">Here's how your business is doing over the last 30 days.</span></div>
+  <button type="button" class="x" aria-label="Dismiss" onclick="document.getElementById('welcome').remove()">✕</button>
+</div>
+{% include "stock/_scope.html" %}
+{% if panel %}
+<div class="grid kpis">
+  {% if panel.profit %}<div class="card kpi"><div class="kh">Profit <span class="dots">···</span></div>
+    <b>{{ panel.profit.total|inr }}</b><div class="kf"><small class="muted">Avg. profit/day {{ panel.profit.avg|inr }}</small>{{ panel.profit.spark }}</div></div>{% endif %}
+  <div class="card kpi"><div class="kh">Total sales <span class="dots">···</span></div>
+    <b>{{ panel.sales.total|inr }}</b><div class="kf"><small class="muted">Avg. sales/day {{ panel.sales.avg|inr }}</small>{{ panel.sales.spark }}</div></div>
+  <div class="card kpi"><div class="kh">Total orders <span class="dots">···</span></div>
+    <b>{{ panel.orders.total }}</b><div class="kf"><small class="muted">Avg. orders/day {{ '%.1f'|format(panel.orders.avg) }}</small>{{ panel.orders.spark }}</div></div>
+</div>
+<div class="two">
+  <div class="card"><div class="ch"><div><h2>Sales analytics</h2><span class="muted">Last {{ panel.days }} days{% if panel.costs %} · sales vs purchases{% endif %}</span></div>
+    <a class="btn ghost sm" href="/app/billing/reports">Full report</a></div>
+    {% if panel.hasBars %}{{ panel.bars }}
+    <div class="legend"><span><i style="background:var(--brand)"></i>Sales</span>{% if panel.costs %}<span><i style="background:var(--brand-pale)"></i>Purchases</span>{% endif %}</div>
+    {% else %}<p class="muted">No bills in this period yet.</p>{% endif %}</div>
+  <div class="card"><div class="ch"><div><h2>Payment modes</h2><span class="muted">Collected, last 30 days</span></div></div>
+    {% if panel.modes %}<div class="stat" style="margin-bottom:6px"><b>{{ panel.modeTotal|inr }}</b></div>{{ panel.donut }}
+    <ul class="mlist">{% for m in panel.modes %}<li><i style="background:{{ m.color }}"></i>{{ m.mode }}<b>{{ m.value|inr }}</b></li>{% endfor %}</ul>
+    {% else %}<p class="muted">No payments recorded yet.</p>{% endif %}</div>
+</div>
+{% endif %}
+<div class="grid">
+  <div class="card stat"><span class="muted">Items</span><b>{{ rows|length }}</b></div>
+  {% if costs %}<div class="card stat"><span class="muted">Stock value</span><b>{{ value|inr }}</b></div>{% endif %}
+  <div class="card stat"><span class="muted">Low stock</span><b class="{{ 'low' if low }}">{{ low|length }}</b></div>
+  <div class="card stat"><span class="muted">Today in</span><b class="in">{{ today.inCount }}</b><small>{{ today.inValue|inr }}</small></div>
+  <div class="card stat"><span class="muted">Today out</span><b class="out">{{ today.outCount }}</b><small>{{ today.outValue|inr }}</small></div>
+</div>
+<div class="card"><h2>Low stock</h2>
+{% if low %}<table><tr><th>Item</th><th class="n">In stock</th><th class="n">Alert at</th></tr>
+{% for r in low %}<tr><td>{{ r.name }} <small class="muted">{{ r.sku }}</small></td><td class="n low">{{ r.qty|qty }} {{ r.unit }}</td><td class="n">{{ r.minStockAlert|qty }}</td></tr>{% endfor %}</table>
+{% else %}<p class="muted">Nothing is running low.</p>{% endif %}</div>
+<div class="card"><h2>Recent activity</h2>
+{% if recent %}<table><tr><th>Date</th><th>Item</th><th>Godown</th><th>Type</th><th class="n">In</th><th class="n">Out</th></tr>
+{% for e in recent %}<tr><td>{{ e.date }}</td><td>{{ e.itemName }}</td><td>{{ e.godownName }}</td><td><span class="badge">{{ e.type }}</span></td>
+<td class="n in">{{ e.qtyIn|qty if e.qtyIn }}</td><td class="n out">{{ e.qtyOut|qty if e.qtyOut }}</td></tr>{% endfor %}</table>
+{% else %}<p class="muted">No stock movements yet. <a href="/app/items">Add an item</a>.</p>{% endif %}</div>
+{% endblock %}

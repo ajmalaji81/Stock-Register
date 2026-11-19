@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Set new password — GodownBook{% endblock %}
+{% from "_logo.html" import logo %}
+{% block public %}
+<div class="auth-wrap"><div class="auth-card card pop-in">
+  {{ logo("/", 38) }}
+  <h1>Set a new password</h1>
+  {% if error %}<div class="flash err" style="margin:0 0 10px">{{ error }}</div>{% endif %}
+  {% if valid %}
+  <form method="post" action="/reset-password">
+    <input type="hidden" name="token" value="{{ token }}">
+    <label>New password<input type="password" name="password" minlength="8" required autofocus></label>
+    <button class="btn" type="submit" style="width:100%;margin-top:6px">Save password</button>
+  </form>
+  {% else %}<p class="muted"><a href="/forgot-password">Request a new link</a></p>{% endif %}
+</div></div>
+{% endblock %}

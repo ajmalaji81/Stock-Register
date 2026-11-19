@@ -1,0 +1,10 @@
+<form method="get" class="row print-hide" style="margin-bottom:12px">
+  <label>Location
+    <select name="scope" onchange="this.form.submit()">
+      <option value="ALL" {{ 'selected' if scope == 'ALL' }}>All godowns</option>
+      {% for g in ws.godowns %}<option value="{{ g.id }}" {{ 'selected' if scope == g.id }}>{{ g.name }}</option>{% endfor %}
+    </select>
+  </label>
+  {% if q is defined %}<label>Search<input name="q" value="{{ q }}" placeholder="Name, SKU, category"></label><button class="btn">Search</button>{% endif %}
+  <noscript><button class="btn">Go</button></noscript>
+</form>

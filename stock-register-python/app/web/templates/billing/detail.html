@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ v.number }} — GodownBook{% endblock %}
+{% block content %}
+<p><a href="/app/billing/{{ group }}">← {{ group|capitalize }}</a></p>
+<h1>{{ kind_label[v.kind] }} {{ v.number }} <span class="badge {{ 'out' if v.status == 'CANCELLED' }}">{{ v.status }}</span></h1>
+<div class="row" style="margin-bottom:12px">
+  <a class="btn ghost" target="_blank" href="/print/voucher/{{ v.id }}?format=a4">Print A4</a>
+  <a class="btn ghost" target="_blank" href="/print/voucher/{{ v.id }}?format=t80">Thermal 80mm</a>
+  <a class="btn ghost" target="_blank" href="/print/voucher/{{ v.id }}?format=t58">Thermal 58mm</a>
+  {% if can_edit %}<a class="btn ghost" href="/app/billing/{{ v.id }}/edit">Edit</a>{% endif %}
+  {% if can_edit %}<a class="btn ghost" href="/app/billing/{{ v.id }}/edit">Edit</a>{% endif %}
+  {% if can_cancel %}<form method="post" action="/app/billing/{{ v.id }}/cancel" onsubmit="return confirm('Cancel this and reverse its stock?')"><button class="btn danger">Cancel</button></form>{% endif %}
+  {% for to in convert_to %}<form method="post" action="/app/billing/{{ v.id }}/convert"><input type="hidden" name="to" value="{{ to }}"><button class="btn">Convert to {{ kind_label[to]|lower }}</button></form>{% endfor %}
+</div>
+<div class="card grid">
+  <div><span class="muted">Date</span><br>{{ v.date }}</div>
+  <div><span class="muted">Party</span><br>{{ v.partyName }}</div>
+  <div><span class="muted">Godown</span><br>{{ v.godownName }}</div>
+  <div><span class="muted">Place of supply</span><br>{{ v.placeOfSupply or '—' }}{% if v.gstEnabled %}<br><small>{{ 'IGST' if v.interState else 'CGST + SGST' }}</small>{% endif %}</div>
+  <div><span class="muted">Created by</span><br>{{ v.createdBy or '—' }}<br><small class="muted">{{ v.createdAt|dt }}</small></div>
+  {% if v.modifiedBy %}<div><span class="muted">Last modified by</span><br>{{ v.modifiedBy }}<br><small class="muted">{{ v.modifiedAt|dt }}</small></div>{% endif %}
+  {% if v.sourceNumber %}<div><span class="muted">From</span><br>{{ v.sourceNumber }}</div>{% endif %}
+  {% if v.convertedTo %}<div><span class="muted">Converted to</span><br>{% for c in v.convertedTo %}<a href="/app/billing/{{ c.id }}">{{ c.number }}</a> {% endfor %}</div>{% endif %}
+</div>
+<div class="card">
+  <table>
+    <tr><th>Item</th><th>HSN</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">Disc %</th><th class="n">Tax %</th><th class="n">Amount</th>{% if v.costTotal is not none %}<th class="n">Cost rate</th>{% endif %}</tr>
+    {% for l in v.lines %}<tr><td>{{ l.itemName }}{% if l.description %}<br><small class="muted">{{ l.description }}</small>{% endif %}{% if l.serials %}<br><small>IMEI: {% for s in l.serials %}<a href="/app/serials/{{ s.split('/')[0] }}">{{ s }}</a>{{ ', ' if not loop.last }}{% endfor %}</small>{% endif %}</td><td>{{ l.hsn }}</td>
+      <td class="n">{{ l.qty|qty }} {{ l.unit }}</td><td class="n">{{ l.rate|inr }}</td><td class="n">{{ l.discountPct|pct }}</td><td class="n">{{ l.taxRate }}</td><td class="n">{{ l.amount|inr }}</td>
+      {% if v.costTotal is not none %}<td class="n">{{ l.costRate|inr }}</td>{% endif %}</tr>{% endfor %}
+  </table>
+  <table style="max-width:340px;margin-left:auto">
+    <tr><td>Subtotal</td><td class="n">{{ v.subtotal|inr }}</td></tr>
+    {% if v.discount %}<tr><td>Discount</td><td class="n">{{ v.discount|inr }}</td></tr>{% endif %}
+    {% if v.gstEnabled %}{% if v.interState %}<tr><td>IGST</td><td class="n">{{ v.igst|inr }}</td></tr>{% else %}<tr><td>CGST</td><td class="n">{{ v.cgst|inr }}</td></tr><tr><td>SGST</td><td class="n">{{ v.sgst|inr }}</td></tr>{% endif %}{% endif %}
+    <tr><td>Round off</td><td class="n">{{ v.roundOff|inr }}</td></tr>
+    <tr><td><b>Total</b></td><td class="n"><b>{{ v.total|inr }}</b></td></tr>
+    <tr><td>Paid with bill</td><td class="n">{{ v.paid|inr }}</td></tr>
+    {% if v.costTotal is not none %}<tr><td>Cost</td><td class="n">{{ v.costTotal|inr }}</td></tr>{% endif %}
+    {% if v.profit is not none %}<tr><td>Profit</td><td class="n">{{ v.profit|inr }}</td></tr>{% endif %}
+  </table>
+  {% if v.paymentSplit %}<h2>Payment</h2><table style="max-width:420px">
+    {% for r in v.paymentSplit %}<tr><td>{{ r.mode }}{% if r.finance %} — {{ r.finance }} (disbursed){% endif %}</td><td class="n">{{ r.amount|inr }}</td></tr>{% endfor %}</table>{% endif %}
+  {% if v.paymentInfo %}<p>Payment info: {{ v.paymentInfo }}</p>{% endif %}
+  {% if v.schemeInfo %}<p>Scheme: {{ v.schemeInfo }}</p>{% endif %}
+  {% if v.paymentSplit %}<p><b>Payment:</b> {% for r in v.paymentSplit %}{{ r.mode }}{% if r.finance %} ({{ r.finance }}, disbursed){% endif %} {{ r.amount|inr }}{{ ' + ' if not loop.last }}{% endfor %}</p>{% endif %}
+  {% if v.paymentInfo %}<p class="muted">Payment info: {{ v.paymentInfo }}</p>{% endif %}
+  {% if v.schemeInfo %}<p class="muted">Scheme: {{ v.schemeInfo }}</p>{% endif %}
+  {% if v.notes %}<p class="muted">Notes: {{ v.notes }}</p>{% endif %}
+</div>
+{% if v.shareToken %}<div class="card"><b>Customer link</b> (no login needed):<br><input readonly onclick="this.select()" value="{{ request.base_url }}print/voucher/{{ v.id }}?t={{ v.shareToken }}"></div>{% endif %}
+{% endblock %}

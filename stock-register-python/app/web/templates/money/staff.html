@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Staff - GodownBook{% endblock %}
+{% block content %}
+<h1>Staff</h1>
+{% if not pro %}<div class="flash err">Staff logins are a Pro feature. <a href="/upgrade">Get Lifetime Pro</a> to add staff.</div>{% endif %}
+<div class="card"><h2>Roles</h2>{% for r in roles %}<div><b>{{ r.label }}</b> - <span class="muted">{{ r.summary }}</span></div>{% endfor %}</div>
+<details class="card"><summary>Add staff member</summary>
+<form method="post" action="/app/staff"><div class="row">
+<label>Name<input name="name" required></label><label>Email<input name="email" type="email" required></label>
+<label>Password (8+)<input name="password" type="password" minlength="8" required></label>
+<label>Role<select name="role">{% for r in roles %}<option value="{{ r.role }}">{{ r.label }}</option>{% endfor %}</select></label></div>
+<p>Godown access (none ticked = all):</p>{% for g in godowns %}<label class="inline"><input type="checkbox" name="godownIds" value="{{ g.id }}" style="display:inline;width:auto"> {{ g.name }}</label> {% endfor %}
+<p><button class="btn">Add staff</button></p></form></details>
+{% for s in staff %}
+<details class="card"><summary>{{ s.name }} <span class="badge">{{ s.role }}</span> {% if not s.active %}<span class="badge">inactive</span>{% endif %} <span class="muted">{{ s.email }}</span></summary>
+<form method="post" action="/app/staff/{{ s.id }}/update"><div class="row">
+<label>Name<input name="name" value="{{ s.name }}"></label>
+<label>Role<select name="role">{% for r in roles %}<option value="{{ r.role }}" {{ 'selected' if s.role == r.role }}>{{ r.label }}</option>{% endfor %}</select></label>
+<label>Reset password<input name="password" type="password" minlength="8" placeholder="leave blank to keep"></label></div>
+<p>{% for g in godowns %}<label class="inline"><input type="checkbox" name="godownIds" value="{{ g.id }}" {{ 'checked' if g.id in s.godownIds }} style="display:inline;width:auto"> {{ g.name }}</label> {% endfor %}</p>
+<label class="inline"><input type="checkbox" name="active" {{ 'checked' if s.active }} style="display:inline;width:auto"> Active</label>
+<p><button class="btn">Save</button></p></form>
+<form method="post" action="/app/staff/{{ s.id }}/delete" onsubmit="return confirm('Remove this staff member?')"><button class="btn danger sm">Remove</button></form></details>
+{% else %}<p class="muted">No staff yet.</p>{% endfor %}
+{% endblock %}

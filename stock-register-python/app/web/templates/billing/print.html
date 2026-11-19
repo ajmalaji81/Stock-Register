@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head>
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>{{ v.number }} — Invoice</title>
+<style>
+{% if fmt == 'a4' %}@page{size:A4;margin:12mm}{% else %}@page{size:{{ width }}mm auto;margin:2mm}{% endif %}
+body{margin:0;background:#f3f5f0;font:13px/1.4 system-ui,sans-serif;color:#000}
+.bar{display:flex;gap:8px;justify-content:center;padding:10px}.bar a,.bar button{padding:6px 12px;border:1px solid #999;border-radius:8px;background:#fff;color:#000;text-decoration:none;font:inherit;cursor:pointer}
+.doc{background:#fff;margin:0 auto 24px;position:relative}
+.a4{max-width:210mm;padding:28px}.thermal{width:{{ width }}mm;padding:2mm;font:11px/1.3 monospace}
+table{width:100%;border-collapse:collapse}th,td{padding:4px 6px;text-align:left;vertical-align:top}.a4 th,.a4 td{border-bottom:1px solid #ccc}th{border-bottom:2px solid #000!important}
+.n{text-align:right}.head{display:flex;justify-content:space-between;gap:12px;border-bottom:2px solid #000;padding-bottom:10px;flex-wrap:wrap}
+.stamp{border:2px solid #dc2626;color:#dc2626;text-align:center;font-weight:700;letter-spacing:.2em;margin:8px 0;padding:2px}
+.c{text-align:center}.dash{border-top:1px dashed #000;margin:4px 0}.muted{color:#555}
+@media print{.bar{display:none}body{background:#fff}.doc{margin:0;max-width:none}}
+</style></head><body>
+<div class="bar"><button onclick="window.print()">Print</button>
+  {% for f, label in [('a4','A4'),('t80','80mm'),('t58','58mm')] %}<a href="?format={{ f }}{% if token %}&t={{ token }}{% endif %}">{{ label }}</a>{% endfor %}</div>
+{% if fmt == 'a4' %}
+<article class="doc a4">
+  <div class="head">
+    <div><h1 style="margin:0;font-size:22px">{{ p.businessName or 'Your business name' }}</h1>
+      {% if p.address %}<div style="white-space:pre-line">{{ p.address }}</div>{% endif %}
+      <div>{% if p.state %}State: {{ p.state }} · {% endif %}{% if p.phone %}Ph: {{ p.phone }}{% endif %}</div>
+      {% if p.gstin %}<b>GSTIN: {{ p.gstin }}</b>{% endif %}</div>
+    <div style="text-align:right"><b style="font-size:17px">{{ title }}</b><br>No: <b>{{ v.number }}</b><br>Date: <b>{{ v.date }}</b>{% if v.sourceNumber %}<br>Ref: {{ v.sourceNumber }}{% endif %}<br><small class="muted">By: {{ v.createdBy }}{% if v.modifiedBy %} · Edited by {{ v.modifiedBy }}{% endif %}</small></div>
+  </div>
+  {% if v.status == 'CANCELLED' %}<div class="stamp">CANCELLED</div>{% endif %}
+  <div style="padding:10px 0;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div><small class="muted">{{ 'SUPPLIER' if v.kind.startswith('PURCHASE') else 'BILL TO' }}</small><br><b>{{ v.partyName }}</b>
+      {% if v.partyAddress %}<div style="white-space:pre-line">{{ v.partyAddress }}</div>{% endif %}
+      {% if v.partyPhone %}<div>Ph: {{ v.partyPhone }}</div>{% endif %}{% if v.partyGstin %}<div>GSTIN: {{ v.partyGstin }}</div>{% endif %}{% if v.partyState %}<div>State: {{ v.partyState }}</div>{% endif %}</div>
+    {% if v.gstEnabled %}<div style="text-align:right"><small class="muted">PLACE OF SUPPLY</small><br>{{ v.placeOfSupply or '—' }}<br><small>{{ 'Inter-state (IGST)' if v.interState else 'Intra-state (CGST + SGST)' }}</small></div>{% endif %}
+  </div>
+  <table><tr><th>#</th><th>Item</th><th>HSN</th><th class="n">Qty</th><th class="n">Rate</th>{% if show_disc %}<th class="n">Disc %</th>{% endif %}{% if v.gstEnabled %}<th class="n">Tax %</th>{% endif %}<th class="n">Amount</th></tr>
+    {% for l in v.lines %}<tr><td>{{ loop.index }}</td><td>{{ l.itemName }}{% if l.description %}<br><small class="muted">{{ l.description }}</small>{% endif %}{% if l.serials %}<br><small>IMEI: {{ l.serials|join(', ') }}</small>{% endif %}</td><td>{{ l.hsn }}</td>
+      <td class="n">{{ l.qty|qty }} {{ l.unit }}</td><td class="n">{{ l.rate|inr }}</td>{% if show_disc %}<td class="n">{{ l.discountPct|pct }}</td>{% endif %}{% if v.gstEnabled %}<td class="n">{{ l.taxRate }}</td>{% endif %}<td class="n">{{ l.taxable|inr }}</td></tr>{% endfor %}</table>
+  <table style="max-width:320px;margin:10px 0 0 auto">
+    <tr><td>Taxable value</td><td class="n">{{ v.subtotal|inr }}</td></tr>
+    {% if v.gstEnabled %}{% if v.interState %}<tr><td>IGST</td><td class="n">{{ v.igst|inr }}</td></tr>{% else %}<tr><td>CGST</td><td class="n">{{ v.cgst|inr }}</td></tr><tr><td>SGST</td><td class="n">{{ v.sgst|inr }}</td></tr>{% endif %}{% endif %}
+    {% if v.roundOff %}<tr><td>Round off</td><td class="n">{{ v.roundOff|inr }}</td></tr>{% endif %}
+    <tr><td><b>Total</b></td><td class="n"><b>{{ v.total|inr }}</b></td></tr>
+    {% if v.paid %}<tr><td>Paid</td><td class="n">{{ v.paid|inr }}</td></tr><tr><td>Balance</td><td class="n">{{ (v.total - v.paid)|inr }}</td></tr>{% endif %}
+  </table>
+  {% if breakup %}<table style="max-width:420px;margin-top:10px"><tr><th>Tax %</th><th class="n">Taxable</th><th class="n">Tax</th></tr>{% for b in breakup %}<tr><td>{{ b.rate }}%</td><td class="n">{{ b.taxable|inr }}</td><td class="n">{{ b.tax|inr }}</td></tr>{% endfor %}</table>{% endif %}
+  {% if v.paymentSplit %}<table style="max-width:420px;margin-top:10px"><tr><th>Payment mode</th><th class="n">Amount</th></tr>
+    {% for r in v.paymentSplit %}<tr><td>{{ r.mode }}{% if r.finance %} — {{ r.finance }} (finance disbursed){% endif %}</td><td class="n">{{ r.amount|inr }}</td></tr>{% endfor %}</table>{% endif %}
+  {% if v.paymentInfo %}<p>Payment info: {{ v.paymentInfo }}</p>{% endif %}
+  {% if v.schemeInfo %}<p>Scheme: {{ v.schemeInfo }}</p>{% endif %}
+{% if v.paymentSplit or v.paymentInfo or v.schemeInfo %}<div{% if fmt == 'a4' %} style="margin:8px 0"{% endif %}>
+    {% if v.paymentSplit %}<b>Payment:</b>{% for r in v.paymentSplit %}<br>{{ r.mode }}{% if r.finance %} - Finance: <b>{{ r.finance }}</b>, disbursed{% endif %}: {{ r.amount|inr }}{% endfor %}{% endif %}
+    {% if v.paymentInfo %}<br>Payment info: {{ v.paymentInfo }}{% endif %}
+    {% if v.schemeInfo %}<br>Scheme: {{ v.schemeInfo }}{% endif %}</div>{% endif %}
+  <p><b>{{ words }}</b></p>
+  {% if v.notes %}<p>Notes: {{ v.notes }}</p>{% endif %}
+  {% if p.bankDetails %}<p style="white-space:pre-line"><b>Bank details</b><br>{{ p.bankDetails }}</p>{% endif %}
+  {% if p.invoiceTerms %}<p class="muted" style="white-space:pre-line"><b>Terms</b><br>{{ p.invoiceTerms }}</p>{% endif %}
+</article>
+{% else %}
+<article class="doc thermal">
+  <div class="c"><b>{{ p.businessName or 'Your business' }}</b>{% if p.address %}<br>{{ p.address }}{% endif %}{% if p.phone %}<br>Ph: {{ p.phone }}{% endif %}{% if p.gstin %}<br>GSTIN: {{ p.gstin }}{% endif %}</div>
+  <div class="dash"></div><div class="c"><b>{{ title }}</b></div>
+  {% if v.status == 'CANCELLED' %}<div class="stamp">CANCELLED</div>{% endif %}
+  <div>No: {{ v.number }}<br>Date: {{ v.date }}<br>To: {{ v.partyName }}</div><div class="dash"></div>
+  {% for l in v.lines %}<div>{{ l.itemName }}{% if l.serials %}<br>IMEI: {{ l.serials|join(', ') }}{% endif %}</div><table><tr><td>{{ l.qty|qty }} x {{ l.rate|inr }}</td><td class="n">{{ l.taxable|inr }}</td></tr></table>{% endfor %}
+  <div class="dash"></div>
+  <table><tr><td>Taxable</td><td class="n">{{ v.subtotal|inr }}</td></tr>
+    {% if v.gstEnabled %}{% if v.interState %}<tr><td>IGST</td><td class="n">{{ v.igst|inr }}</td></tr>{% else %}<tr><td>CGST</td><td class="n">{{ v.cgst|inr }}</td></tr><tr><td>SGST</td><td class="n">{{ v.sgst|inr }}</td></tr>{% endif %}{% endif %}
+    <tr><td><b>TOTAL</b></td><td class="n"><b>{{ v.total|inr }}</b></td></tr></table>
+  {% if v.paymentSplit %}<div class="dash"></div><table>{% for r in v.paymentSplit %}<tr><td>{{ r.mode }}{% if r.finance %} ({{ r.finance }} finance){% endif %}</td><td class="n">{{ r.amount|inr }}</td></tr>{% endfor %}</table>{% endif %}
+  {% if v.paymentInfo %}<div>Pay info: {{ v.paymentInfo }}</div>{% endif %}
+  {% if v.schemeInfo %}<div>Scheme: {{ v.schemeInfo }}</div>{% endif %}
+  <div class="dash"></div>{% if v.paymentSplit or v.paymentInfo or v.schemeInfo %}<div>
+    {% if v.paymentSplit %}<b>Payment:</b>{% for r in v.paymentSplit %}<br>{{ r.mode }}{% if r.finance %} - Finance: <b>{{ r.finance }}</b>, disbursed{% endif %}: {{ r.amount|inr }}{% endfor %}{% endif %}
+    {% if v.paymentInfo %}<br>Payment info: {{ v.paymentInfo }}{% endif %}
+    {% if v.schemeInfo %}<br>Scheme: {{ v.schemeInfo }}{% endif %}</div>{% endif %}
+<div>{{ words }}</div><div class="c">Thank you!</div>
+</article>
+{% endif %}
+</body></html>

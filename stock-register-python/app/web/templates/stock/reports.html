@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Stock reports · GodownBook{% endblock %}
+{% block content %}
+<h1>Stock report</h1>
+<p><a class="btn ghost" href="/app/reports.csv">Download CSV</a></p>
+{% if costs %}<div class="card stat"><span class="muted">Total stock value</span><b>{{ total_value|inr }}</b></div>{% endif %}
+<div class="card"><table><tr><th>Item</th>{% for g in ws.godowns %}<th class="n">{{ g.name }}</th>{% endfor %}<th class="n">Total</th>{% if costs %}<th class="n">Value</th>{% endif %}</tr>
+{% for r in rows %}<tr><td>{{ r.name }}<br><small class="muted">{{ r.sku }}</small></td>
+{% for g in ws.godowns %}<td class="n">{{ r.stock.get(g.id, 0)|qty }}</td>{% endfor %}
+<td class="n {{ 'low' if r.low }}">{{ r.total|qty }} {{ r.unit }}{% if r.low %} ⚠{% endif %}</td>{% if costs %}<td class="n">{{ r.value|inr }}</td>{% endif %}</tr>
+{% else %}<tr><td colspan="9" class="muted">No items.</td></tr>{% endfor %}</table></div>
+<p class="muted">⚠ = at or below the item's minimum stock alert.</p>
+{% endblock %}

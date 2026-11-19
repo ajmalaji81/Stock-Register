@@ -1,0 +1,17 @@
+from tests.conftest import signup
+
+
+def test_workspace_page_and_nav(client):
+    assert client.get("/app/workspace", follow_redirects=False).status_code == 303  # needs login
+    signup(client)
+    r = client.get("/app/workspace")
+    assert r.status_code == 200 and "ws-frames" in r.text and "/static/workspace.js" in r.text
+    assert "/app/workspace" in client.get("/app").text  # menu entry
+
+
+def test_bill_form_keeps_input_script(client):
+    signup(client)
+    js = client.get("/static/billing.js").text
+    assert "gb-bill-draft" in js and "flash.err" in js
+    page = client.get("/app/billing/new?kind=PURCHASE").text
+    assert 'id="bill"' in page

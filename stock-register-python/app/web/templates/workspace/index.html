@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Workspace — GodownBook{% endblock %}
+{% block content %}
+<div class="ws" id="ws">
+  <div class="ws-bar" role="tablist" aria-label="Open pages">
+    <div class="ws-tabs" id="ws-tabs"></div>
+    <button type="button" class="btn ghost sm ws-add" id="ws-add" title="Open a new tab (Dashboard)">+ New tab</button>
+  </div>
+  <p class="muted ws-help">Each tab keeps its page alive, so a half-made bill stays as it is while you look at a ledger in another tab. Click a menu item to open it in the current tab; <b>Ctrl+click</b> (or middle-click) opens it in a new tab. Alt+1…8 switches tabs.</p>
+  <div class="ws-frames" id="ws-frames"></div>
+</div>
+<script src="/static/workspace.js"></script>
+{% endblock %}
