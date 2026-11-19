@@ -93,5 +93,5 @@
 <script type="application/json" id="parties-data">{{ parties|tojson }}</script>
 <script type="application/json" id="edit-lines">{{ edit_lines|tojson }}</script>
 <script type="application/json" id="edit-pays">{{ (edit.paymentSplit if edit else [])|tojson }}</script>
-<script src="/static/billing.js"></script>
+<script src="{{ asset('billing.js') }}"></script>
 {% endblock %}

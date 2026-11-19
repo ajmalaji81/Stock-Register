@@ -142,3 +142,25 @@ def _dt(iso_str: Any) -> str:
 
 templates.env.filters["pct"] = _pct
 templates.env.filters["dt"] = _dt
+
+
+_asset_cache: dict[str, tuple[float, str]] = {}
+
+
+def _asset(name: str) -> str:
+    """/static/<name>?v=<content hash>: the address changes whenever the file does, so browsers never reuse a stale copy."""
+    import hashlib
+
+    path = BASE / "static" / name
+    try:
+        mtime = path.stat().st_mtime
+        hit = _asset_cache.get(name)
+        if hit is None or hit[0] != mtime:
+            hit = (mtime, hashlib.sha1(path.read_bytes()).hexdigest()[:10])
+            _asset_cache[name] = hit
+        return f"/static/{name}?v={hit[1]}"
+    except OSError:
+        return f"/static/{name}"
+
+
+templates.env.globals["asset"] = _asset

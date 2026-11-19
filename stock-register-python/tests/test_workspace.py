@@ -21,3 +21,12 @@ def test_static_files_are_revalidated(client):
     r = client.get("/static/app.css")
     assert r.status_code == 200 and r.headers["cache-control"] == "no-cache" and r.headers.get("etag")
     assert client.get("/static/app.css", headers={"If-None-Match": r.headers["etag"]}).status_code == 304
+
+
+def test_asset_urls_carry_a_version(client):
+    import re
+
+    html = client.get("/login").text
+    assert re.search(r'/static/app\.css\?v=[0-9a-f]{10}"', html) and re.search(r'/static/theme\.js\?v=[0-9a-f]{10}"', html)
+    url = re.search(r'(/static/app\.css\?v=[0-9a-f]{10})', html).group(1)
+    assert client.get(url).status_code == 200

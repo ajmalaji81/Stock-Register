@@ -7,12 +7,12 @@
   <meta name="theme-color" content="#16a34a">
   <script>(function(){try{var m=localStorage.getItem('gb-mode')||'light',a=localStorage.getItem('gb-accent')||'blue';var d=m==='dark'||(m==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';document.documentElement.dataset.accent=a;document.documentElement.dataset.ws=localStorage.getItem('gb-workspace')==='on'?'on':'off';}catch(e){}})();</script>
   <script>if(window.self!==window.top){document.documentElement.classList.add('embedded');}</script>
-  <script src="/static/combo.js"></script>
+  <script src="{{ asset('combo.js') }}"></script>
   <title>{% block title %}GodownBook{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
 {% block shell %}
@@ -49,6 +49,6 @@
   {% block public %}{% endblock %}
 {% endif %}
 {% endblock %}
-<script src="/static/theme.js"></script>
+<script src="{{ asset('theme.js') }}"></script>
 </body>
 </html>
