@@ -2,6 +2,7 @@
 {% block title %}{{ title }} — GodownBook{% endblock %}
 {% block content %}
 <h1>{{ title }}</h1>
+<p class="muted fy-note">Showing <b>FY {{ fy.label }}</b> ({{ fy.start }} to {{ fy.end }}){% if not fy.is_current %} · an earlier year{% endif %}. Change the year next to your profile at the top. Searching by number or name looks at every year.</p>
 <div class="row" style="margin-bottom:12px">
   {% for k in creatable %}<a class="btn" href="/app/billing/new?kind={{ k }}">+ {{ kind_label[k] }}</a>{% endfor %}
 </div>
@@ -23,7 +24,7 @@
       <td>{{ kind_label[r.kind] }}</td><td>{{ r.partyName }}</td><td>{{ r.createdBy }}{% if r.modifiedBy %}<br><small class="muted">edited by {{ r.modifiedBy }}</small>{% endif %}</td>
       <td class="n">{{ r.total|inr }}</td><td class="n">{{ r.paid|inr }}</td>
       <td>{{ r.createdBy }}{% if r.modifiedBy %}<br><small class="muted">edited by {{ r.modifiedBy }}</small>{% endif %}</td>
-      <td><span class="badge {{ 'out' if r.status == 'CANCELLED' }}">{{ r.status }}</span></td>
+      <td><span class="badge {{ 'out' if r.status == 'CANCELLED' }}">{{ r.status }}</span>{% if r.history %} <span class="badge old">Old year</span>{% endif %}</td>
     </tr>
     {% else %}<tr><td colspan="8" class="muted">Nothing here yet.</td></tr>{% endfor %}
   </table>

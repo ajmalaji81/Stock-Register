@@ -19,6 +19,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from ..core.errors import StockError
+from ..core.fy import current_fy, fy_label, fy_options, fy_range, parse_fy
 from ..core.gst import INDIAN_STATES, KIND_LABEL
 from ..core.money import format_inr
 from ..core.permissions import role_label
@@ -94,12 +95,28 @@ def nav_for(actor: Actor) -> list[dict]:
     return [{"group": g, "items": items} for g, items in out.items()]
 
 
+FY_COOKIE = "sr_fy"
+
+
+def selected_fy(request: Request) -> int:
+    """The financial year picked next to the profile (a cookie); the current year when none."""
+    return parse_fy(request.cookies.get(FY_COOKIE))
+
+
+def fy_context(request: Request) -> dict:
+    y = selected_fy(request)
+    start, end = fy_range(y)
+    return {"selected": y, "label": fy_label(y), "start": start, "end": end, "is_current": y == current_fy(),
+            "options": fy_options(y)}
+
+
 def render(request: Request, name: str, actor: Optional[Actor] = None, active: str = "", status: int = 200, **ctx: Any):
     """Render a template with the standard context (actor, nav, flash, plan badge, formatters)."""
     flash = pop_flash(request)
     base: dict[str, Any] = {
         "request": request, "actor": actor, "active": active, "flash": flash,
         "nav": nav_for(actor) if actor else [], "states": INDIAN_STATES, "kind_label": KIND_LABEL,
+        "fy": fy_context(request),
     }
     if actor:
         o = actor.owner

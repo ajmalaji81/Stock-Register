@@ -66,6 +66,7 @@ _NEW_COLUMNS = [
     ("Voucher", "branchBy", "TEXT NOT NULL DEFAULT ''"),
     ("Voucher", "branchAt", "INTEGER"),
     ("Voucher", "linkedVoucherId", "TEXT"),
+    ("Voucher", "history", "BOOLEAN NOT NULL DEFAULT 0"),
 ]
 
 

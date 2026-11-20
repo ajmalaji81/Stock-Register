@@ -83,7 +83,7 @@ def _sales_panel(db, actor, scope: str, days: int = 14) -> Optional[dict]:
     since = today - timedelta(days=29)
     kinds = ["SALE", "SALE_RETURN"] + (["PURCHASE", "PURCHASE_RETURN"] if costs else [])
     stmt = select(Voucher).where(
-        Voucher.userId == actor.account_id, Voucher.kind.in_(kinds), Voucher.status != "CANCELLED", Voucher.date >= since.isoformat()
+        Voucher.userId == actor.account_id, Voucher.kind.in_(kinds), Voucher.status != "CANCELLED", Voucher.history.is_(False), Voucher.date >= since.isoformat()
     )
     if actor.godown_ids is not None:
         stmt = stmt.where(Voucher.godownId.in_(actor.godown_ids))

@@ -21,7 +21,8 @@ from ..services import stock as stock_svc
 from ..services import vouchers
 from ..services.actor import can_use_godown
 from ..services.vouchers import can_see_kind, permission_for
-from .common import LoginRedirect, need, page_actor, redirect, render, templates
+from ..core.fy import current_fy, fy_range
+from .common import LoginRedirect, need, page_actor, redirect, render, selected_fy, templates
 
 router = APIRouter()
 
@@ -62,7 +63,8 @@ def reports(request: Request, side: str = "sales", frm: Optional[str] = None, to
         need(actor, "reports.view")
         try:
             q = S.SalesReportQuery.model_validate(
-                {k: v for k, v in {"side": side, "from": request.query_params.get("from"), "to": to}.items() if v}
+                {k: v for k, v in {"side": side, "from": request.query_params.get("from") or fy_range(selected_fy(request))[0],
+                                   "to": to or fy_range(selected_fy(request))[1]}.items() if v}
             )
         except ValidationError as e:
             return redirect("/app/billing/reports", flash=first_message(e), error=True)
@@ -86,6 +88,15 @@ def reports(request: Request, side: str = "sales", frm: Optional[str] = None, to
 
 def _pay_context() -> dict:
     return {"pay_modes": PAYMENT_MODES, "finance_companies": FINANCE_COMPANIES}
+
+
+HISTORY_KINDS = ("SALE", "PURCHASE", "SALE_RETURN", "PURCHASE_RETURN")
+
+
+def _default_date(request: Request) -> str:
+    """Today, unless an older financial year is selected: then that year's last day."""
+    y = selected_fy(request)
+    return today_iso() if y >= current_fy() else fy_range(y)[1]
 
 
 def _party_options(db, actor) -> list[dict]:
@@ -142,7 +153,8 @@ def new_bill(request: Request, kind: str = "SALE", source: str = ""):
         purchase_side = is_purchase_side(kind)
         return render(
             request, "billing/new.html", actor, _group_of(kind), kind=kind, purchase_side=purchase_side, ws=ws,
-            parties=_party_options(db, actor), today=today_iso(), business_state=actor.owner.state,
+            parties=_party_options(db, actor), today=_default_date(request), hist_default=selected_fy(request) < current_fy(),
+            can_hist=kind in HISTORY_KINDS, fy_start_now=fy_range(current_fy())[0], business_state=actor.owner.state,
             can_pay=kind in ("SALE", "PURCHASE"), items=_item_options(ws, purchase_side), edit=None, edit_lines=[],
             **_pay_context(),
         )
@@ -151,7 +163,7 @@ def new_bill(request: Request, kind: str = "SALE", source: str = ""):
 def bill_form(
     kind: str = Form(""), date: str = Form(""), godownId: str = Form(""), partyId: str = Form(""),
     placeOfSupply: str = Form(""), notes: str = Form(""), gstEnabled: str = Form(""),
-    paymentInfo: str = Form(""), schemeInfo: str = Form(""),
+    paymentInfo: str = Form(""), schemeInfo: str = Form(""), history: str = Form(""), oldNumber: str = Form(""),
     paidNow: str = Form("0"), paymentMode: str = Form("CASH"),
     payMode: list[str] = Form(default=[]), payAmount: list[str] = Form(default=[]), payFinance: list[str] = Form(default=[]),
     itemId: list[str] = Form(default=[]), qty: list[str] = Form(default=[]), rate: list[str] = Form(default=[]),
@@ -174,7 +186,8 @@ def bill_form(
     ]
     return {"kind": kind, "date": date, "partyId": partyId or None, "godownId": godownId, "gstEnabled": bool(gstEnabled),
             "placeOfSupply": placeOfSupply, "notes": notes, "lines": lines, "paidNow": paidNow or 0, "paymentMode": paymentMode,
-            "paymentSplit": split, "paymentInfo": paymentInfo, "schemeInfo": schemeInfo}
+            "paymentSplit": split, "paymentInfo": paymentInfo, "schemeInfo": schemeInfo, "history": bool(history),
+            "oldNumber": oldNumber}
 
 
 @router.post("/app/billing/new")
@@ -214,7 +227,8 @@ def edit_bill_page(voucher_id: str, request: Request):
         purchase_side = is_purchase_side(kind)
         return render(
             request, "billing/new.html", actor, _group_of(kind), kind=kind, purchase_side=purchase_side, ws=ws,
-            parties=_party_options(db, actor), today=v["date"], business_state=actor.owner.state,
+            parties=_party_options(db, actor), today=v["date"], hist_default=False, can_hist=False,
+            fy_start_now=fy_range(current_fy())[0], business_state=actor.owner.state,
             can_pay=kind in ("SALE", "PURCHASE"), items=_item_options(ws, purchase_side), edit=v,
             edit_lines=[
                 {"itemId": l["itemId"], "description": l["description"], "qty": l["qty"], "rate": l["rate"],
@@ -248,6 +262,8 @@ def _list_page(request: Request, group: str, kind: str, status: str, frm: str, t
         visible = [k for k in kinds if can_see_kind(actor, k)]
         if not visible:
             return redirect("/app", flash="Your role doesn't allow this.", error=True)
+        if not q and not frm and not to:  # no filter typed: show the selected financial year
+            frm, to = fy_range(selected_fy(request))
         f = {"kind": kind if kind in visible else ",".join(visible), "status": status if status in STATUSES else None,
              "from": frm or None, "to": to or None, "q": q or None}
         rows = vouchers.list_vouchers(db, actor, f)

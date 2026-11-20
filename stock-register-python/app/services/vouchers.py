@@ -20,6 +20,7 @@ from ..core.gst import (
     godown_identity, CONVERSIONS, KIND_LABEL, KIND_PREFIX, LineInput, calc_totals, format_number, is_inter_state, is_purchase_side,
     stock_effect,
 )
+from ..core.fy import current_fy, fy_range
 from ..core.jsmath import r2, round3
 from ..models import Godown, Party, PartyPayment, User, Voucher, VoucherLine, now_utc
 from ..schemas import SettingsInput, VoucherCreateInput
@@ -110,7 +111,8 @@ def to_dto(v: Voucher, actor: Actor, source_number: Optional[str], converted_to:
         "gstEnabled": v.gstEnabled, "interState": v.interState, "placeOfSupply": v.placeOfSupply,
         "subtotal": v.subtotal, "discount": v.discount, "cgst": v.cgst, "sgst": v.sgst, "igst": v.igst,
         "roundOff": v.roundOff, "total": v.total,
-        "paid": r2(sum(p.amount for p in v.payments)) if v.party else r2(sum(r["amount"] for r in split)),
+        "paid": r2(sum(p.amount for p in v.payments)) if (v.party and not v.history) else r2(sum(r["amount"] for r in split)),
+        "history": v.history,
         "paymentSplit": split, "paymentInfo": v.paymentInfo, "schemeInfo": v.schemeInfo,
         "modifiedBy": v.modifiedBy, "modifiedAt": iso(v.modifiedAt) if v.modifiedAt else None,
         "notes": v.notes, "sourceId": v.sourceId, "sourceNumber": source_number, "convertedTo": converted_to,
@@ -136,7 +138,8 @@ def to_dto(v: Voucher, actor: Actor, source_number: Optional[str], converted_to:
 def next_number(db: Session, account_id: str, kind: str, prefix: str) -> str:
     numbers = db.execute(
         select(Voucher.number).where(
-            Voucher.userId == account_id, Voucher.kind == kind, Voucher.number.startswith(f"{prefix}-", autoescape=True)
+            Voucher.userId == account_id, Voucher.kind == kind, Voucher.history.is_(False),
+            Voucher.number.startswith(f"{prefix}-", autoescape=True),
         )
     ).scalars().all()
     top = 0.0
@@ -212,6 +215,16 @@ def _reverse_stock(db: Session, actor: Actor, v: Voucher, ref_type: str, remarks
         )
 
 
+def _check_history(inp: VoucherCreateInput, kind: str, party: Optional[Party], system: bool) -> None:
+    if system or kind not in ("SALE", "PURCHASE", "SALE_RETURN", "PURCHASE_RETURN"):
+        raise StockError("Only sales and purchase bills (and their returns) can be old-year records")
+    if party is not None and party.linkedGodownId:
+        raise StockError("An invoice between your own godowns can't be an old-year record")
+    start, _ = fy_range(current_fy())
+    if inp.date >= start:
+        raise StockError(f"Old-year records must be dated before the current financial year (before {start}). For this year, enter a normal bill.")
+
+
 def _create_in_tx(
     db: Session, actor: Actor, inp: VoucherCreateInput, source_id: Optional[str] = None, skip_stock: bool = False,
     existing: Optional[Voucher] = None, system: bool = False, extra: Optional[dict] = None,
@@ -252,7 +265,12 @@ def _create_in_tx(
     if len(items) != len(ids):
         raise StockError("One of the items was not found", 404)
     by_id = {i.id: i for i in items}
-    serial_tokens = serial_svc.prepare_lines([(l, round3(l.qty)) for l in inp.lines], by_id, kind, source_id)
+    history = bool(inp.history)
+    if history:
+        _check_history(inp, kind, party, system)
+        serial_tokens = [[] for _ in inp.lines]  # nothing physical moves, so no IMEIs are recorded
+    else:
+        serial_tokens = serial_svc.prepare_lines([(l, round3(l.qty)) for l in inp.lines], by_id, kind, source_id)
 
     place_of_supply = inp.placeOfSupply or (party.state if party else "") or home_state
     inter_state = inp.gstEnabled and is_inter_state(home_state, place_of_supply)
@@ -283,11 +301,18 @@ def _create_in_tx(
         sgst=t.sgst, igst=t.igst, roundOff=t.round_off, total=t.total, costTotal=cost_total, notes=inp.notes,
         paymentInfo=inp.paymentInfo, schemeInfo=inp.schemeInfo, paymentSplit=json.dumps(pay_rows),
         branchStatus=branch_svc.PENDING if branch_dest is not None else "", branchGodownId=branch_dest.id if branch_dest is not None else None,
-        branchBy="", branchAt=None,
+        branchBy="", branchAt=None, history=history,
     )
 
     if existing is None:
-        number = next_number(db, account_id, kind, prefix_for(kind, owner.invoicePrefix))
+        if history:
+            number = inp.oldNumber.strip()
+            if not number:
+                raise StockError("Enter the old invoice number from your books")
+            if db.execute(select(Voucher.id).where(Voucher.userId == account_id, Voucher.kind == kind, Voucher.number == number)).first():
+                raise StockError(f"{number} already exists")
+        else:
+            number = next_number(db, account_id, kind, prefix_for(kind, owner.invoicePrefix))
         v = Voucher(userId=account_id, kind=kind, number=number, sourceId=source_id, createdBy=actor.name, **fields, **(extra or {}))
         v.lines.extend(voucher_lines)
         db.add(v)
@@ -313,12 +338,12 @@ def _create_in_tx(
         v.modifiedBy, v.modifiedAt = actor.name, now_utc()
     db.flush()
 
-    if kind in serial_svc.SERIAL_KINDS:
+    if kind in serial_svc.SERIAL_KINDS and not history:
         entries = [(by_id[l.itemId], tok, l.rate) for (l, _), toks in zip(lines, serial_tokens) for tok in toks]
         if entries:
             serial_svc.record_units(db, actor, v, kind, entries, party.name if party else "Cash customer")
 
-    effect = None if skip_stock else stock_effect(kind)
+    effect = None if (skip_stock or history) else stock_effect(kind)
     if effect:
         for l, q in lines:
             apply_stock_entry(
@@ -329,7 +354,7 @@ def _create_in_tx(
                 ),
             )
 
-    if party:
+    if party and not history:  # an old bill's payments are only recorded on the bill, not in today's customer dues
         for r in pay_rows:
             note = f"With {KIND_LABEL[kind].lower()} {number}" + (f" · {r['finance']}" if r["finance"] else "")
             db.add(
@@ -365,6 +390,10 @@ def update_voucher(db: Session, actor: Actor, voucher_id: str, inp: VoucherCreat
         raise StockError("Only open bills can be edited", 409)
     if inp.kind != v.kind:
         raise StockError("The type of a bill can't be changed")
+    if inp.history and not v.history:
+        raise StockError("An existing bill can't be turned into an old-year record. Cancel it and enter the old bill instead.")
+    if v.history:
+        inp = inp.model_copy(update={"history": True})
     if v.branchStatus in (branch_svc.APPROVING, branch_svc.APPROVED):
         raise StockError("The receiving godown already approved this invoice, so it can't be edited. Cancel the purchase there first.", 409)
     if v.linkedVoucherId:

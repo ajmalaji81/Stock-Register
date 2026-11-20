@@ -203,6 +203,8 @@ class VoucherCreateInput(Model):
     paymentSplit: Annotated[list[PaymentSplitInput], _check(lambda v: len(v) <= 10, "Too many payment modes")] = []
     paymentInfo: Text(300) = ""
     schemeInfo: Text(300) = ""
+    history: bool = False  # old financial year record: no stock / IMEI / customer-due effect
+    oldNumber: Text(40) = ""  # the bill's number in your old books (history bills only)
 
 
 class VoucherConvertInput(Model):

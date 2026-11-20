@@ -38,7 +38,7 @@ def balance_parts(db: Session, account_id: str, parties: list[Any]) -> dict[str,
     ids = list(out)
     vouchers = db.execute(
         select(Voucher.partyId, Voucher.kind, func.sum(Voucher.total))
-        .where(Voucher.userId == account_id, Voucher.partyId.in_(ids), Voucher.kind.in_(BALANCE_KINDS), Voucher.status != "CANCELLED")
+        .where(Voucher.userId == account_id, Voucher.partyId.in_(ids), Voucher.kind.in_(BALANCE_KINDS), Voucher.status != "CANCELLED", Voucher.history.is_(False))
         .group_by(Voucher.partyId, Voucher.kind)
     ).all()
     payments = db.execute(
@@ -258,7 +258,7 @@ def party_ledger(db: Session, actor: Actor, party_id: str, from_: Optional[str] 
     p = get_party(db, actor.account_id, party_id)
     vouchers = db.execute(
         select(Voucher).where(
-            Voucher.userId == actor.account_id, Voucher.partyId == party_id, Voucher.kind.in_(BALANCE_KINDS), Voucher.status != "CANCELLED"
+            Voucher.userId == actor.account_id, Voucher.partyId == party_id, Voucher.kind.in_(BALANCE_KINDS), Voucher.status != "CANCELLED", Voucher.history.is_(False)
         )
     ).scalars().all()
     payments = db.execute(select(PartyPayment).where(PartyPayment.userId == actor.account_id, PartyPayment.partyId == party_id)).scalars().all()

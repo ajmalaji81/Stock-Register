@@ -245,6 +245,8 @@ class Voucher(Base):
     sourceId: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     createdBy: Mapped[str] = mapped_column(String, default="")
     createdAt: Mapped[datetime] = _created()
+    # An old financial year's bill entered for the records: in reports and GST, but no stock, IMEI or customer-due effect.
+    history: Mapped[bool] = mapped_column(Boolean, default=False)
     # Branch-to-branch invoice: PENDING (waiting for the receiving godown) -> APPROVED (auto purchase created) | REJECTED | CANCELLED
     branchStatus: Mapped[str] = mapped_column(String, default="")
     branchGodownId: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # receiving godown

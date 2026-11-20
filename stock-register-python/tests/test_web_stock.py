@@ -97,7 +97,10 @@ def test_staff_without_permission_is_blocked_and_costs_hidden(client):
     client.post("/api/staff", json={"name": "Ravi", "email": "ravi@example.com", "password": "password123", "role": "SALES"})
     s = TestClient(create_app())
     s.post("/api/auth/login", json={"email": "ravi@example.com", "password": "password123"})
-    assert "77" not in s.get("/app/items").text and "Stock value" not in s.get("/app").text
+    import re
+
+    page = re.sub(r"\?v=[0-9a-f]+", "", s.get("/app/items").text)  # the asset version stamps are hex and may contain "77"
+    assert "77" not in page and "Stock value" not in s.get("/app").text
     r = s.post("/app/items/save", data={"name": "N", "sku": "N1"}, follow_redirects=True)
     assert "doesn&#39;t allow" in r.text or "doesn't allow" in r.text
     assert [i["sku"] for i in ws(client)["items"]] == ["R1"]

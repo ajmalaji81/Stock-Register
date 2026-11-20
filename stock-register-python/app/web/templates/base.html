@@ -33,6 +33,10 @@
   <main class="main">
     <header class="topbar print-hide">
       <form method="get" action="/app/billing/sales" class="tsearch"><input type="search" name="q" placeholder="Search invoice, party or notes" aria-label="Search invoices"></form>
+      <form method="post" action="/app/fy" class="fysw" title="Financial year (April to March)">
+        <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+        <select name="fy" aria-label="Financial year" onchange="this.form.submit()">{% for o in fy.options %}<option value="{{ o.year }}" {{ 'selected' if o.year == fy.selected }}>FY {{ o.label }}{{ ' (current)' if o.current }}</option>{% endfor %}</select>
+      </form>
       <button type="button" class="themebtn" id="theme-toggle" title="Switch light / dark" aria-label="Switch light or dark mode">◐</button>
       <div class="tuser">{% if actor.avatar %}<img src="{{ actor.avatar }}" alt="">{% else %}<span class="av">{{ actor.name[:1]|upper }}</span>{% endif %}
         <div><b>{{ actor.name }}</b><small>{{ actor.email }}</small></div></div>

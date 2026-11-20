@@ -14,6 +14,8 @@
   var json = function (id, d) { try { return JSON.parse(document.getElementById(id).textContent); } catch (e) { return d; } };
   var total = 0;
   var isSale = form.dataset.kind === "SALE", voucherId = form.dataset.voucher || "";
+  var histBox = document.getElementById("hist");  // old financial-year record: nothing physical moves, so no IMEIs
+  var isHist = function () { return !!(histBox && histBox.checked); };
   var enc = encodeURIComponent;
   var getJSON = function (url) { return fetch(url, { credentials: "same-origin" }).then(function (r) { return r.json(); }); };
 
@@ -129,7 +131,7 @@
   function tokens(tr) { return (tr.querySelector(".f-serials").value || "").split(/[\s,;]+/).filter(Boolean); }
   function serialUI(tr) {
     var sel = tr.querySelector(".f-item"), o = sel.options[sel.selectedIndex];
-    var tracked = o && o.getAttribute("data-serial") === "1";
+    var tracked = o && o.getAttribute("data-serial") === "1" && !isHist();
     var box = tr.querySelector(".serial-box");
     box.hidden = !tracked;
     if (!tracked) { tr.querySelector(".f-serials").value = ""; if (isSale) layoutSerial(); return; }
@@ -154,7 +156,7 @@
       if (isSale) tr.querySelector(".f-serials").value = "";
       serialUI(tr);
       recalc();
-      if (isSale && o && o.getAttribute("data-serial") === "1") openModal(tr);
+      if (isSale && o && o.getAttribute("data-serial") === "1" && !isHist()) openModal(tr);
     });
     tr.querySelector(".f-serials").addEventListener("input", function () { serialUI(tr); });
     var viewBtn = tr.querySelector(".f-sview");
@@ -386,6 +388,18 @@
   document.getElementById("add").addEventListener("click", function () { addLine(); });
   form.addEventListener("input", recalc);
   form.addEventListener("change", recalc);
+  if (histBox) {
+    var oldNo = document.getElementById("oldno"), dateEl = form.elements.date;
+    var syncHist = function () {
+      if (oldNo) oldNo.hidden = !histBox.checked;
+      if (dateEl) { if (histBox.checked) { var d = new Date(histBox.dataset.before); d.setDate(d.getDate() - 1); dateEl.max = d.toISOString().slice(0, 10); } else { dateEl.removeAttribute("max"); } }
+      table.querySelectorAll("tr.line").forEach(serialUI);
+      if (oldNo && histBox.checked && oldNo.querySelector("input")) oldNo.querySelector("input").required = true;
+      else if (oldNo && oldNo.querySelector("input")) oldNo.querySelector("input").required = false;
+    };
+    histBox.addEventListener("change", syncHist);
+    window.__syncHist = syncHist;
+  }
   var pre = draft ? draft.lines : json("edit-lines", []);
   if (pre.length) pre.forEach(addLine); else addLine();
   if (draft) {
@@ -398,6 +412,7 @@
     if (dp) pick(dp); else if (qBox) qBox.value = draft.party.text || "";
   }
   recalc();
+  if (window.__syncHist) window.__syncHist();
 
   // remember the form when it is submitted (after the checks above passed)
   form.addEventListener("submit", function (e) {

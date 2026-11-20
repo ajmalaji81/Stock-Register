@@ -11,6 +11,7 @@
   {% else %}<p class="muted">No data in this range.</p>{% endif %}</div>
 {% endmacro %}
 <h1>Sales &amp; GST reports</h1>
+<p class="muted fy-note">Defaults to <b>FY {{ fy.label }}</b> ({{ fy.start }} to {{ fy.end }}). Change the year next to your profile, or set From / To yourself. Old-year records are included.</p>
 <form class="card row" method="get">
   <label>Side<select name="side"><option value="sales" {{ 'selected' if side == 'sales' }}>Sales</option>{% if can_purchases %}<option value="purchases" {{ 'selected' if side == 'purchases' }}>Purchases</option>{% endif %}</select></label>
   <label>From<input type="date" name="from" value="{{ frm }}"></label>

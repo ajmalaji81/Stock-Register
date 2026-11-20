@@ -2,7 +2,8 @@
 {% block title %}{{ v.number }} — GodownBook{% endblock %}
 {% block content %}
 <p><a href="/app/billing/{{ group }}">← {{ group|capitalize }}</a></p>
-<h1>{{ kind_label[v.kind] }} {{ v.number }} <span class="badge {{ 'out' if v.status == 'CANCELLED' }}">{{ v.status }}</span></h1>
+<h1>{{ kind_label[v.kind] }} {{ v.number }} <span class="badge {{ 'out' if v.status == 'CANCELLED' }}">{{ v.status }}</span>{% if v.history %} <span class="badge old">Old year</span>{% endif %}</h1>
+{% if v.history %}<p class="muted">An old financial-year record: it is in reports and GST, but it did not change stock, IMEIs or customer dues.</p>{% endif %}
 <div class="row" style="margin-bottom:12px">
   <a class="btn ghost" target="_blank" href="/print/voucher/{{ v.id }}?format=a4">Print A4</a>
   <a class="btn ghost" target="_blank" href="/print/voucher/{{ v.id }}?format=t80">Thermal 80mm</a>
