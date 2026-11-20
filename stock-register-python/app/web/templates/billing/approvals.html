@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Branch approvals — GodownBook{% endblock %}
+{% block content %}
+<h1>Branch approvals</h1>
+<p class="muted">Invoices other godowns billed to yours. Check the phones (IMEIs) against what arrived, then approve. Approving creates the purchase in your godown automatically; rejecting sends the stock back.</p>
+{% for r in rows %}
+<div class="card">
+  <div class="row" style="align-items:center">
+    <div><b>{{ r.number }}</b> · {{ r.date }}<br><span class="muted">{{ r['from'] }} → {{ r.to }} · by {{ r.createdBy }}</span></div>
+    <div class="n"><b>{{ r.total|inr }}</b><br><small class="muted">{{ 'IGST ' ~ (r.igst|inr) if r.interState else 'CGST ' ~ (r.cgst|inr) ~ ' + SGST ' ~ (r.sgst|inr) }}</small></div>
+    <form method="post" action="/app/billing/{{ r.id }}/branch/approve" style="flex:0"><button class="btn">Approve</button></form>
+    <form method="post" action="/app/billing/{{ r.id }}/branch/reject" style="flex:0" onsubmit="return confirm('Reject this invoice and send the stock back to {{ r['from'] }}?')"><button class="btn danger">Reject</button></form>
+  </div>
+  <table>
+    <tr><th>Item</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">Disc %</th><th class="n">Tax %</th><th class="n">Amount</th></tr>
+    {% for l in r.lines %}<tr><td>{{ l.item }}{% if l.serials %}<br><small class="muted">IMEI: {{ l.serials|join(', ') }}</small>{% endif %}</td>
+      <td class="n">{{ l.qty|qty }} {{ l.unit }}</td><td class="n">{{ l.rate|inr }}</td><td class="n">{{ l.discountPct|pct }}</td><td class="n">{{ l.taxRate }}</td><td class="n">{{ l.amount|inr }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% else %}<div class="card muted">Nothing is waiting for your approval.</div>{% endfor %}
+{% endblock %}

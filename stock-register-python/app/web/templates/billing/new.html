@@ -7,7 +7,7 @@
   <input type="hidden" name="kind" value="{{ kind }}">
   <div class="card row">
     <label>Date<input type="date" name="date" value="{{ today }}" required></label>
-    <label>Godown<select name="godownId" required>{% for g in ws.godowns %}<option value="{{ g.id }}" {{ 'selected' if edit and edit.godownId == g.id }}>{{ g.name }}</option>{% endfor %}</select></label>
+    <label>Godown<select name="godownId" required>{% for g in ws.godowns %}<option value="{{ g.id }}" data-state="{{ g.state }}" {{ 'selected' if edit and edit.godownId == g.id }}>{{ g.name }}</option>{% endfor %}</select></label>
     <div class="psearch">
       <label>{{ 'Supplier' if purchase_side else 'Customer' }}
         <input type="text" id="party-q" autocomplete="off" placeholder="Click to choose, or type name / phone{{ '' if purchase_side or kind == 'SALE_RETURN' else ' (blank = cash sale)' }}"></label>

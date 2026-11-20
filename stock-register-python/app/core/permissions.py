@@ -19,6 +19,7 @@ PERMISSIONS: tuple[str, ...] = (
     "settings.manage",  # business profile, invoice settings
     "billing.upgrade",  # buy Lifetime Pro
     "activity.view",  # activity timeline
+    "branch.approve",  # approve / reject invoices another godown billed to your godown
 )
 
 STAFF_ROLES: list[dict[str, str]] = [
@@ -33,7 +34,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "SALES_PURCHASE": frozenset(
         {
             "stock.move", "stock.transfer", "sales.create", "purchases.create", "documents.manage",
-            "parties.manage", "payments.manage", "reports.view", "costs.view",
+            "parties.manage", "payments.manage", "reports.view", "costs.view", "branch.approve",
         }
     ),
     "SALES": frozenset({"sales.create", "documents.manage", "parties.manage", "payments.manage"}),

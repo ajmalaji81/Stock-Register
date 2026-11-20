@@ -15,9 +15,10 @@ from sqlalchemy.orm import Session
 
 from ..core.engine import assert_can_remove, assert_within_limit, today_iso
 from ..core.errors import StockError
+from ..core.gst import godown_identity
 from ..core.jsmath import round3
 from ..core.plans import effective_plan, limits_for
-from ..models import Godown, Item, LedgerEntry, Stock, User, Voucher, VoucherLine
+from ..models import Godown, Item, LedgerEntry, Party, Stock, User, Voucher, VoucherLine
 from ..schemas import ItemInput, MovementInput, TransferInput
 from .activity import iso, log_activity
 from .actor import Actor, actor_info, assert_godown_access, can_use_godown
@@ -46,7 +47,10 @@ def load_workspace(db: Session, actor: Actor) -> dict:
             "trialEndsAt": iso(owner.trialEndsAt) if owner.trialEndsAt else None,
         },
         "limits": limits_for(owner.plan, owner.trialEndsAt),
-        "godowns": [{"id": g.id, "name": g.name} for g in godowns if can_use_godown(actor, g.id)],
+        "godowns": [
+            {"id": g.id, "name": g.name, "state": godown_identity(g, owner)["state"], "gstin": g.gstin, "ownState": g.state, "address": g.address}
+            for g in godowns if can_use_godown(actor, g.id)
+        ],
         "items": [
             {
                 "id": i.id, "name": i.name, "sku": i.sku, "category": i.category, "unit": i.unit,
@@ -265,6 +269,9 @@ def create_godown(db: Session, actor: Actor, name: str) -> None:
     item_ids = db.execute(select(Item.id).where(Item.userId == uid)).scalars().all()
     if item_ids:
         db.execute(insert(Stock), [{"itemId": i, "godownId": g.id, "quantity": 0} for i in item_ids])
+    from . import branch as branch_svc
+
+    branch_svc.ensure_all(db, uid)
     log_activity(db, actor, "godown.create", name)
 
 
@@ -273,6 +280,20 @@ def rename_godown(db: Session, actor: Actor, godown_id: str, name: str) -> None:
     if res.rowcount == 0:
         raise StockError("Godown not found", 404)
     log_activity(db, actor, "godown.rename", name)
+
+
+def update_godown(db: Session, actor: Actor, godown_id: str, inp) -> None:
+    """Name plus the GST identity (state, GSTIN, address) this godown bills under."""
+    from . import branch as branch_svc
+
+    g = get_godown(db, actor.account_id, godown_id)
+    g.name = inp.name
+    for k in ("state", "gstin", "address"):  # only what was sent: a plain rename must not wipe the GST details
+        if k in inp.model_fields_set:
+            setattr(g, k, getattr(inp, k))
+    db.flush()
+    branch_svc.ensure_all(db, actor.account_id)  # branch parties follow the godowns' names, states and GSTINs
+    log_activity(db, actor, "godown.update", f"{g.name} · {g.state or 'business state'} · {g.gstin or 'no GSTIN'}")
 
 
 def delete_godown(db: Session, actor: Actor, godown_id: str) -> None:

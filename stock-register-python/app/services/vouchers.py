@@ -17,12 +17,13 @@ from .. import config
 from ..core.engine import today_iso
 from ..core.errors import StockError
 from ..core.gst import (
-    CONVERSIONS, KIND_LABEL, KIND_PREFIX, LineInput, calc_totals, format_number, is_inter_state, is_purchase_side,
+    godown_identity, CONVERSIONS, KIND_LABEL, KIND_PREFIX, LineInput, calc_totals, format_number, is_inter_state, is_purchase_side,
     stock_effect,
 )
 from ..core.jsmath import r2, round3
-from ..models import Party, PartyPayment, User, Voucher, VoucherLine, now_utc
+from ..models import Godown, Party, PartyPayment, User, Voucher, VoucherLine, now_utc
 from ..schemas import SettingsInput, VoucherCreateInput
+from . import branch as branch_svc
 from .activity import iso, log_activity
 from .actor import Actor, assert_can, assert_godown_access, can_use_godown
 from . import serials as serial_svc
@@ -89,6 +90,7 @@ def to_dto(v: Voucher, actor: Actor, source_number: Optional[str], converted_to:
     kind = v.kind
     sign = -1 if kind in ("SALE_RETURN", "PURCHASE_RETURN") else 1
     profit = r2(sign * (v.subtotal - v.costTotal)) if kind in ("SALE", "SALE_RETURN") else None
+    ident = godown_identity(v.godown, actor.owner)
     try:
         split = json.loads(v.paymentSplit or "[]")
     except ValueError:
@@ -102,6 +104,9 @@ def to_dto(v: Voucher, actor: Actor, source_number: Optional[str], converted_to:
         "partyState": v.party.state if v.party else "",
         "partyAddress": v.party.address if v.party else "",
         "godownId": v.godownId, "godownName": v.godown.name,
+        "godownState": ident["state"], "godownGstin": ident["gstin"], "godownAddress": ident["address"],
+        "branchStatus": v.branchStatus, "branchGodownId": v.branchGodownId, "branchVoucherId": v.branchVoucherId,
+        "linkedVoucherId": v.linkedVoucherId, "branchBy": v.branchBy, "branchAt": iso(v.branchAt) if v.branchAt else None,
         "gstEnabled": v.gstEnabled, "interState": v.interState, "placeOfSupply": v.placeOfSupply,
         "subtotal": v.subtotal, "discount": v.discount, "cgst": v.cgst, "sgst": v.sgst, "igst": v.igst,
         "roundOff": v.roundOff, "total": v.total,
@@ -209,15 +214,20 @@ def _reverse_stock(db: Session, actor: Actor, v: Voucher, ref_type: str, remarks
 
 def _create_in_tx(
     db: Session, actor: Actor, inp: VoucherCreateInput, source_id: Optional[str] = None, skip_stock: bool = False,
-    existing: Optional[Voucher] = None,
+    existing: Optional[Voucher] = None, system: bool = False, extra: Optional[dict] = None,
 ) -> str:
-    """Create a bill, or (existing=...) rewrite one in place: same id and number, stock re-applied."""
+    """Create a bill, or (existing=...) rewrite one in place: same id and number, stock re-applied.
+
+    system=True is for the purchase created by a branch approval: the approver's role isn't checked against purchases.create.
+    """
     kind = inp.kind
-    assert_can(actor, permission_for(kind))
+    if not system:
+        assert_can(actor, permission_for(kind))
     assert_godown_access(actor, inp.godownId)
     account_id = actor.account_id
     owner = db.get(User, account_id)
-    get_godown(db, account_id, inp.godownId)
+    src_godown = get_godown(db, account_id, inp.godownId)
+    home_state = godown_identity(src_godown, owner)["state"]
 
     party = None
     if inp.partyId:
@@ -228,6 +238,12 @@ def _create_in_tx(
         raise StockError("Choose the supplier for this bill")
     if kind == "SALE_RETURN" and party is None:
         raise StockError("Choose the customer returning the goods")
+    branch_dest = None
+    if party is not None and party.linkedGodownId:
+        if kind != "SALE" and not system:
+            raise StockError("A godown can only be billed with a sales invoice. To just move stock, use a transfer.")
+        if kind == "SALE":
+            branch_dest = branch_svc.check_supply(db, account_id, src_godown, party.linkedGodownId, owner)
 
     from ..models import Item
 
@@ -238,8 +254,8 @@ def _create_in_tx(
     by_id = {i.id: i for i in items}
     serial_tokens = serial_svc.prepare_lines([(l, round3(l.qty)) for l in inp.lines], by_id, kind, source_id)
 
-    place_of_supply = inp.placeOfSupply or (party.state if party else "") or owner.state
-    inter_state = inp.gstEnabled and is_inter_state(owner.state, place_of_supply)
+    place_of_supply = inp.placeOfSupply or (party.state if party else "") or home_state
+    inter_state = inp.gstEnabled and is_inter_state(home_state, place_of_supply)
     lines = [(l, round3(l.qty)) for l in inp.lines]
     t = calc_totals(
         [LineInput(qty=q, rate=l.rate, discount_pct=l.discountPct, tax_rate=l.taxRate) for l, q in lines],
@@ -250,6 +266,8 @@ def _create_in_tx(
     pay_rows = _payment_rows(inp, kind, t.total)
     if pay_rows and party is None and kind != "SALE":
         raise StockError("Choose a party to record a payment against")
+    if pay_rows and branch_dest is not None:
+        raise StockError("An invoice to your own godown can't take a payment. The receiving godown approves it instead.")
 
     voucher_lines = [
         VoucherLine(
@@ -264,11 +282,13 @@ def _create_in_tx(
         interState=inter_state, placeOfSupply=place_of_supply, subtotal=t.subtotal, discount=t.discount, cgst=t.cgst,
         sgst=t.sgst, igst=t.igst, roundOff=t.round_off, total=t.total, costTotal=cost_total, notes=inp.notes,
         paymentInfo=inp.paymentInfo, schemeInfo=inp.schemeInfo, paymentSplit=json.dumps(pay_rows),
+        branchStatus=branch_svc.PENDING if branch_dest is not None else "", branchGodownId=branch_dest.id if branch_dest is not None else None,
+        branchBy="", branchAt=None,
     )
 
     if existing is None:
         number = next_number(db, account_id, kind, prefix_for(kind, owner.invoicePrefix))
-        v = Voucher(userId=account_id, kind=kind, number=number, sourceId=source_id, createdBy=actor.name, **fields)
+        v = Voucher(userId=account_id, kind=kind, number=number, sourceId=source_id, createdBy=actor.name, **fields, **(extra or {}))
         v.lines.extend(voucher_lines)
         db.add(v)
     else:
@@ -345,6 +365,10 @@ def update_voucher(db: Session, actor: Actor, voucher_id: str, inp: VoucherCreat
         raise StockError("Only open bills can be edited", 409)
     if inp.kind != v.kind:
         raise StockError("The type of a bill can't be changed")
+    if v.branchStatus in (branch_svc.APPROVING, branch_svc.APPROVED):
+        raise StockError("The receiving godown already approved this invoice, so it can't be edited. Cancel the purchase there first.", 409)
+    if v.linkedVoucherId:
+        raise StockError("This purchase was created automatically from another godown's invoice and can't be edited.", 409)
     skip = False
     if v.sourceId:
         src_kind = db.execute(select(Voucher.kind).where(Voucher.id == v.sourceId)).scalar_one_or_none()
@@ -371,7 +395,14 @@ def get_voucher(db: Session, actor: Actor, voucher_id: str) -> dict:
     children = db.execute(
         select(Voucher.id, Voucher.kind, Voucher.number).where(Voucher.userId == actor.account_id, Voucher.sourceId == v.id)
     ).all()
-    return to_dto(v, actor, source, [{"id": c.id, "kind": c.kind, "number": c.number} for c in children], True)
+    dto = to_dto(v, actor, source, [{"id": c.id, "kind": c.kind, "number": c.number} for c in children], True)
+    dto["branchGodownName"] = db.execute(select(Godown.name).where(Godown.id == v.branchGodownId)).scalar_one_or_none() if v.branchGodownId else None
+    link_ids = [x for x in (v.branchVoucherId, v.linkedVoucherId) if x]
+    nums = {r.id: (r.number, r.godownId) for r in db.execute(select(Voucher.id, Voucher.number, Voucher.godownId).where(Voucher.id.in_(link_ids))).all()} if link_ids else {}
+    seen = lambda vid: bool(vid and vid in nums and can_use_godown(actor, nums[vid][1]))  # noqa: E731
+    dto["branchVoucherNumber"] = nums[v.branchVoucherId][0] if seen(v.branchVoucherId) else None
+    dto["linkedVoucherNumber"] = nums[v.linkedVoucherId][0] if seen(v.linkedVoucherId) else None
+    return dto
 
 
 def list_vouchers(db: Session, actor: Actor, f: dict) -> list[dict]:
@@ -426,31 +457,46 @@ def list_vouchers(db: Session, actor: Actor, f: dict) -> list[dict]:
     ]
 
 
-def cancel_voucher(db: Session, actor: Actor, voucher_id: str) -> dict:
-    v = db.execute(select(Voucher).where(Voucher.id == voucher_id, Voucher.userId == actor.account_id)).scalar_one_or_none()
-    if v is None or not can_use_godown(actor, v.godownId):
-        raise StockError("Bill not found", 404)
+def _cancel_in_tx(db: Session, actor: Actor, v: Voucher, branch_status: str = "CANCELLED") -> None:
+    """Undo a bill's stock, IMEIs and payments and mark it cancelled (no permission checks: callers do those)."""
     kind = v.kind
-    assert_can(actor, permission_for(kind))
-    if v.status == "CANCELLED":
-        raise StockError("This is already cancelled")
-    if v.status == "CONVERTED":
-        raise StockError("This was converted into another bill. Cancel that bill first.", 409)
-
     serial_svc.void_voucher(db, actor.account_id, v.id)
     # Reverse exactly the stock this voucher still holds (a challan-converted sale moved none).
     _reverse_stock(db, actor, v, "VOUCHER_CANCEL", f"Cancelled {v.number}", today_iso())
     # Payments recorded together with this bill go away with it.
     linked = db.execute(delete(PartyPayment).where(PartyPayment.userId == actor.account_id, PartyPayment.voucherId == v.id)).rowcount
-    number, source_id = v.number, v.sourceId
+    number, source_id, was_branch = v.number, v.sourceId, bool(v.branchStatus)
     db.execute(update(Voucher).where(Voucher.id == v.id).values(status="CANCELLED"))
+    if was_branch:  # a branch invoice that never got approved
+        db.execute(update(Voucher).where(Voucher.id == v.id).values(branchStatus=branch_status))
     # A cancelled conversion re-opens its quotation / order / challan.
     if source_id:
         db.execute(
             update(Voucher).where(Voucher.id == source_id, Voucher.userId == actor.account_id, Voucher.status == "CONVERTED").values(status="OPEN")
         )
+    # Cancelling the purchase that an approval created sends the branch invoice back to "waiting for approval".
+    if kind == "PURCHASE" and v.linkedVoucherId:
+        db.execute(
+            update(Voucher).where(Voucher.id == v.linkedVoucherId, Voucher.userId == actor.account_id).values(
+                branchStatus=branch_svc.PENDING, branchVoucherId=None, branchBy="", branchAt=None
+            )
+        )
     db.expire_all()
     log_activity(db, actor, "voucher.cancel", f"{KIND_LABEL[kind]} {number}" + (f" (removed {linked} linked payment)" if linked else ""))
+
+
+def cancel_voucher(db: Session, actor: Actor, voucher_id: str) -> dict:
+    v = db.execute(select(Voucher).where(Voucher.id == voucher_id, Voucher.userId == actor.account_id)).scalar_one_or_none()
+    if v is None or not can_use_godown(actor, v.godownId):
+        raise StockError("Bill not found", 404)
+    assert_can(actor, permission_for(v.kind))
+    if v.status == "CANCELLED":
+        raise StockError("This is already cancelled")
+    if v.status == "CONVERTED":
+        raise StockError("This was converted into another bill. Cancel that bill first.", 409)
+    if v.branchStatus in (branch_svc.APPROVING, branch_svc.APPROVED):
+        raise StockError("The receiving godown already approved this invoice. Ask them to cancel the purchase created from it first.", 409)
+    _cancel_in_tx(db, actor, v)
     return get_voucher(db, actor, voucher_id)
 
 

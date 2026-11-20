@@ -106,6 +106,10 @@ class Godown(Base):
     id: Mapped[str] = _id()
     userId: Mapped[str] = mapped_column(ForeignKey("User.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String)
+    # GST identity of this location (blank = use the business profile). Decides CGST+SGST vs IGST and what the invoice prints.
+    state: Mapped[str] = mapped_column(String, default="")
+    gstin: Mapped[str] = mapped_column(String, default="")
+    address: Mapped[str] = mapped_column(String, default="")
     createdAt: Mapped[datetime] = _created()
 
 
@@ -207,6 +211,7 @@ class Party(Base):
     state: Mapped[str] = mapped_column(String, default="")
     address: Mapped[str] = mapped_column(String, default="")
     openingBalance: Mapped[float] = mapped_column(Float, default=0)  # + they owe us, - we owe them
+    linkedGodownId: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # this party IS one of our own godowns (branch)
     createdAt: Mapped[datetime] = _created()
     updatedAt: Mapped[datetime] = mapped_column(PrismaDateTime, default=now_utc, onupdate=now_utc)
 
@@ -240,6 +245,13 @@ class Voucher(Base):
     sourceId: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     createdBy: Mapped[str] = mapped_column(String, default="")
     createdAt: Mapped[datetime] = _created()
+    # Branch-to-branch invoice: PENDING (waiting for the receiving godown) -> APPROVED (auto purchase created) | REJECTED | CANCELLED
+    branchStatus: Mapped[str] = mapped_column(String, default="")
+    branchGodownId: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # receiving godown
+    branchVoucherId: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # the purchase created on approval
+    branchBy: Mapped[str] = mapped_column(String, default="")  # who approved / rejected
+    branchAt: Mapped[Optional[datetime]] = mapped_column(PrismaDateTime, nullable=True)
+    linkedVoucherId: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # on the auto purchase: the branch sale it came from
     modifiedBy: Mapped[str] = mapped_column(String, default="")  # set when the owner edits the bill
     modifiedAt: Mapped[Optional[datetime]] = mapped_column(PrismaDateTime, nullable=True)
     paymentInfo: Mapped[str] = mapped_column(String, default="")  # free-text payment details (printed)

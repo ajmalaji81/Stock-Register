@@ -109,8 +109,18 @@ class TransferInput(Model):
     serials: Annotated[list[str], BeforeValidator(lambda v: _serial_list(v))] = []
 
 
+def _gstin_up(v: Any) -> Any:
+    return v.strip().upper() if isinstance(v, str) else v
+
+
 class GodownInput(Model):
     name: Annotated[str, BeforeValidator(_strip), _check(lambda v: 1 <= len(v) <= 60, "Godown name is required")]
+    state: Annotated[str, BeforeValidator(_strip), _check(lambda v: v == "" or v in INDIAN_STATES, "Choose a state from the list")] = ""
+    gstin: Annotated[
+        str, BeforeValidator(_gstin_up),
+        _check(lambda v: v == "" or bool(re.match(r"^[0-9]{2}[A-Z0-9]{13}$", v)), "GSTIN must be 15 characters, e.g. 33ABCDE1234F1Z5"),
+    ] = ""
+    address: Text(300) = ""
 
 
 class SignupInput(Model):

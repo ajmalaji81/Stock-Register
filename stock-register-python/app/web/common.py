@@ -40,6 +40,7 @@ NAV: list[tuple[str, str, str, str, list[str], str]] = [
     ("import", "Bulk import", "⇪", "Stock", ["items.manage", "parties.manage"], "/app/import"),
     ("sales", "Sales", "🧾", "Billing", ["sales.create"], "/app/billing/sales"),
     ("purchases", "Purchases", "🛒", "Billing", ["purchases.create"], "/app/billing/purchases"),
+    ("approvals", "Branch approvals", "✅", "Billing", ["branch.approve"], "/app/billing/approvals"),
     ("documents", "Quotes & orders", "📄", "Billing", ["documents.manage"], "/app/billing/documents"),
     ("parties", "Parties", "👥", "Money", ["parties.manage", "payments.manage"], "/app/parties"),
     ("expenses", "Expenses", "💸", "Money", ["expenses.manage"], "/app/expenses"),

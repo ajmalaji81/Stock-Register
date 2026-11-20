@@ -56,6 +56,16 @@ _NEW_COLUMNS = [
     ("PartyPayment", "withBill", "BOOLEAN NOT NULL DEFAULT 0"),
     ("Item", "trackSerial", "BOOLEAN NOT NULL DEFAULT 0"),
     ("VoucherLine", "serials", "TEXT NOT NULL DEFAULT '[]'"),
+    ("Godown", "state", "TEXT NOT NULL DEFAULT ''"),
+    ("Godown", "gstin", "TEXT NOT NULL DEFAULT ''"),
+    ("Godown", "address", "TEXT NOT NULL DEFAULT ''"),
+    ("Party", "linkedGodownId", "TEXT"),
+    ("Voucher", "branchStatus", "TEXT NOT NULL DEFAULT ''"),
+    ("Voucher", "branchGodownId", "TEXT"),
+    ("Voucher", "branchVoucherId", "TEXT"),
+    ("Voucher", "branchBy", "TEXT NOT NULL DEFAULT ''"),
+    ("Voucher", "branchAt", "INTEGER"),
+    ("Voucher", "linkedVoucherId", "TEXT"),
 ]
 
 

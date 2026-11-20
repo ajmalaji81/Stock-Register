@@ -170,7 +170,7 @@ def test_permissions_by_role():
     assert _allowed("OWNER") == sorted(PERMISSIONS)
     assert sorted(p for p in PERMISSIONS if not role_can("STORE_ADMIN", p)) == ["billing.upgrade", "settings.manage", "staff.manage"]
     assert _allowed("SALES_PURCHASE") == sorted([
-        "costs.view", "documents.manage", "parties.manage", "payments.manage", "purchases.create",
+        "branch.approve", "costs.view", "documents.manage", "parties.manage", "payments.manage", "purchases.create",
         "reports.view", "sales.create", "stock.move", "stock.transfer",
     ])
     assert _allowed("SALES") == ["documents.manage", "parties.manage", "payments.manage", "sales.create"]

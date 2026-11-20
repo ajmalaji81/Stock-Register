@@ -12,6 +12,12 @@
   {% if can_cancel %}<form method="post" action="/app/billing/{{ v.id }}/cancel" onsubmit="return confirm('Cancel this and reverse its stock?')"><button class="btn danger">Cancel</button></form>{% endif %}
   {% for to in convert_to %}<form method="post" action="/app/billing/{{ v.id }}/convert"><input type="hidden" name="to" value="{{ to }}"><button class="btn">Convert to {{ kind_label[to]|lower }}</button></form>{% endfor %}
 </div>
+{% if v.branchStatus %}<div class="card"><b>Branch invoice</b>
+  {% if v.branchStatus == 'PENDING' %}— sent to <b>{{ v.branchGodownName }}</b>, waiting for their approval. The purchase is created there when they approve.
+  {% elif v.branchStatus == 'APPROVED' %}— approved by {{ v.branchBy }} on {{ v.branchAt|dt }}{% if v.branchVoucherNumber %}; purchase <a href="/app/billing/{{ v.branchVoucherId }}">{{ v.branchVoucherNumber }}</a> created{% endif %}.
+  {% elif v.branchStatus == 'REJECTED' %}— rejected by {{ v.branchBy }} on {{ v.branchAt|dt }}. The stock went back to {{ v.godownName }}.
+  {% elif v.branchStatus == 'CANCELLED' %}— cancelled before approval.{% endif %}</div>{% endif %}
+{% if v.linkedVoucherId %}<div class="card"><b>Created automatically</b> from another godown's invoice{% if v.linkedVoucherNumber %} <a href="/app/billing/{{ v.linkedVoucherId }}">{{ v.linkedVoucherNumber }}</a>{% endif %}. It can't be edited; to undo it, cancel it and the invoice goes back to waiting for approval.</div>{% endif %}
 <div class="card grid">
   <div><span class="muted">Date</span><br>{{ v.date }}</div>
   <div><span class="muted">Party</span><br>{{ v.partyName }}</div>

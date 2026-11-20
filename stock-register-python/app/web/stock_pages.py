@@ -299,6 +299,14 @@ def godown_create(request: Request, name: str = Form("")):
     return act(request, ("godowns.manage",), "/app/godowns", "Godown added", work)
 
 
+@router.post("/app/godowns/{godown_id}/details")
+def godown_details(godown_id: str, request: Request, name: str = Form(""), state: str = Form(""), gstin: str = Form(""), address: str = Form("")):
+    def work(db, actor):
+        stock.update_godown(db, actor, godown_id, S.GodownInput.model_validate({"name": name, "state": state, "gstin": gstin, "address": address}))
+
+    return act(request, ("godowns.manage",), "/app/godowns", "Godown saved", work)
+
+
 @router.post("/app/godowns/{godown_id}/rename")
 def godown_rename(godown_id: str, request: Request, name: str = Form("")):
     def work(db, actor):

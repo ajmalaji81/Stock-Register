@@ -38,7 +38,9 @@
     partyState = p ? p.state || "" : "";
     qBox.value = p ? p.name + (p.phone ? " · " + p.phone : "") : qBox.value;
     list.hidden = true;
-    hint.textContent = p ? (p.state ? "State: " + p.state : "") : "";
+    hint.textContent = p ? (p.branch
+      ? "Branch invoice: " + p.branch + " must approve it, then a purchase is created there automatically."
+      : (p.state ? "State: " + p.state : "")) : "";
     recalc();
   }
   function matches(q) {
@@ -85,8 +87,10 @@
 
   function interState() {
     var pos = document.getElementById("pos").value;
-    var st = pos || partyState || form.dataset.businessState;
-    var a = norm(form.dataset.businessState), b = norm(st);
+    var gs = form.elements.godownId, go = gs && gs.options[gs.selectedIndex];
+    var home = (go && go.getAttribute("data-state")) || form.dataset.businessState;  // the billing godown's own state
+    var st = pos || partyState || home;
+    var a = norm(home), b = norm(st);
     return document.getElementById("gst").checked && a !== "" && b !== "" && a !== b;
   }
 

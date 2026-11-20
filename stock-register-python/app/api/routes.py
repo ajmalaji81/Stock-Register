@@ -18,7 +18,7 @@ from ..core.ppp import country_from_headers, price_for
 from ..db import session_scope
 from ..models import Godown, Item, Payment, StaffMember, User, WebhookEvent
 from .. import schemas as S
-from ..services import parties, staff, stock, vouchers
+from ..services import branch as branch_svc, parties, staff, stock, vouchers
 from ..services.activity import log_activity
 from ..services.actor import actor_info, current_actor, require_actor, require_permission
 from ..services.auth import DUMMY_HASH, end_session, hash_password, start_session, verify_password
@@ -192,9 +192,28 @@ def create_godown(request: Request, body: S.GodownInput):
 
 @router.patch("/godowns/{godown_id}")
 def rename_godown(godown_id: str, request: Request, body: S.GodownInput):
+    """Rename, and/or set the godown's own state / GSTIN / address (whatever is sent)."""
     with session_scope() as db:
-        stock.rename_godown(db, require_permission(db, request, "godowns.manage"), godown_id, body.name)
+        stock.update_godown(db, require_permission(db, request, "godowns.manage"), godown_id, body)
     return ok({"ok": True})
+
+
+@router.get("/branch/pending")
+def branch_pending(request: Request):
+    with session_scope() as db:
+        return ok(branch_svc.pending_for(db, require_actor(db, request)))
+
+
+@router.post("/vouchers/{voucher_id}/branch/approve")
+def branch_approve(voucher_id: str, request: Request):
+    with session_scope() as db:
+        return ok(branch_svc.approve(db, require_actor(db, request), voucher_id))
+
+
+@router.post("/vouchers/{voucher_id}/branch/reject")
+def branch_reject(voucher_id: str, request: Request):
+    with session_scope() as db:
+        return ok(branch_svc.reject(db, require_actor(db, request), voucher_id))
 
 
 @router.delete("/godowns/{godown_id}")
@@ -332,6 +351,7 @@ def get_parties(request: Request):
     with session_scope() as db:
         actor = require_actor(db, request)
         q = S.parse_query(S.PartyQuery, qparams(request))
+        branch_svc.ensure_all(db, actor.account_id)  # own godowns show up as parties
         return ok(parties.list_parties(db, actor, {"q": q.q, "type": q.type, "sort": q.sort}))
 
 

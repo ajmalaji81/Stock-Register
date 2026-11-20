@@ -16,6 +16,7 @@ from ..core.gst import CONVERSIONS, KIND_LABEL, VOUCHER_KINDS, amount_in_words, 
 from ..db import session_scope
 from ..models import Godown, Party
 from ..schemas import VoucherCreateInput, first_message
+from ..services import branch as branch_svc
 from ..services import stock as stock_svc
 from ..services import vouchers
 from ..services.actor import can_use_godown
@@ -88,10 +89,13 @@ def _pay_context() -> dict:
 
 
 def _party_options(db, actor) -> list[dict]:
+    branch_svc.ensure_all(db, actor.account_id)  # own godowns are offered as parties (only when there are two or more)
     rows = db.execute(
-        select(Party.id, Party.name, Party.state, Party.phone).where(Party.userId == actor.account_id).order_by(Party.name)
+        select(Party.id, Party.name, Party.state, Party.phone, Party.linkedGodownId)
+        .where(Party.userId == actor.account_id).order_by(Party.name)
     ).all()
-    return [{"id": p.id, "name": p.name, "state": p.state, "phone": p.phone} for p in rows]
+    to = {g.id: g.name for g in db.execute(select(Godown).where(Godown.userId == actor.account_id)).scalars()}
+    return [{"id": p.id, "name": p.name, "state": p.state, "phone": p.phone, "branch": to.get(p.linkedGodownId) or ""} for p in rows]
 
 
 def _item_options(ws: dict, purchase_side: bool) -> list[dict]:
@@ -100,6 +104,30 @@ def _item_options(ws: dict, purchase_side: bool) -> list[dict]:
          "trackSerial": i.get("trackSerial", False), "price": i["purchasePrice"] if purchase_side else i["salePrice"]}
         for i in ws["items"]
     ]
+
+
+@router.get("/app/billing/approvals")
+def approvals(request: Request):
+    with session_scope() as db:
+        actor = page_actor(db, request)
+        need(actor, "branch.approve")
+        rows = branch_svc.pending_for(db, actor)
+        return render(request, "billing/approvals.html", actor, "approvals", rows=rows)
+
+
+@router.post("/app/billing/{voucher_id}/branch/{decision}")
+def branch_decide(voucher_id: str, decision: str, request: Request):
+    if decision not in ("approve", "reject"):
+        return redirect("/app/billing/approvals", flash="Unknown action", error=True)
+    try:
+        with session_scope() as db:
+            actor = page_actor(db, request)
+            res = (branch_svc.approve if decision == "approve" else branch_svc.reject)(db, actor, voucher_id)
+    except StockError as e:
+        return redirect("/app/billing/approvals", flash=e.message, error=True)
+    if decision == "approve":
+        return redirect("/app/billing/approvals", flash=f"Approved {res['saleNumber']}. Purchase {res['purchaseNumber']} created in your godown.")
+    return redirect("/app/billing/approvals", flash=f"Rejected {res['saleNumber']}. The stock went back to the billing godown.")
 
 
 @router.get("/app/billing/new")
@@ -315,6 +343,7 @@ def print_voucher(voucher_id: str, request: Request, format: str = "a4", t: str 
             except StockError:
                 return templates.TemplateResponse(request, "billing/print_missing.html", {}, status_code=404)
             p = vouchers.profile_of(actor.owner)
+        p = {**p, "gstin": v["godownGstin"], "state": v["godownState"], "address": v["godownAddress"]}  # the issuing godown's identity
         return templates.TemplateResponse(
             request, "billing/print.html",
             {"v": v, "p": p, "fmt": fmt, "title": _title(v), "breakup": _breakup(v) if v["gstEnabled"] else [],

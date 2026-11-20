@@ -33,6 +33,13 @@ class LineResult:
     amount: float
 
 
+def godown_identity(godown, owner) -> dict:
+    """State / GSTIN / address a godown bills under. A godown with its own state or GSTIN uses those; otherwise the business profile."""
+    if godown is not None and (godown.state or godown.gstin):
+        return {"state": godown.state or owner.state, "gstin": godown.gstin, "address": godown.address or owner.address, "own": True}
+    return {"state": owner.state, "gstin": owner.gstin, "address": owner.address, "own": False}
+
+
 def calc_line(l: LineInput, gst_enabled: bool = True) -> LineResult:
     gross = l.qty * l.rate
     disc = min(100, max(0, l.discount_pct or 0))
