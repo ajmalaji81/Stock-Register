@@ -16,7 +16,7 @@ from ..core.jsmath import round2
 from ..core.plans import limits_for
 from ..db import session_scope
 from ..services import parties, staff, stock
-from .common import need, page_actor, redirect, render
+from .common import need, page_actor, redirect, render, selected_fy
 
 router = APIRouter()
 
@@ -66,72 +66,82 @@ def _rows(ws: dict, scope: str, q: str = "") -> list[dict]:
 # ---------------- dashboard ----------------
 
 
-def _sales_panel(db, actor, scope: str, days: int = 14) -> Optional[dict]:
-    """Dashboard sales widgets (last `days` days vs the 30 before). None when the role can't see sales."""
+def _sales_panel(db, actor, scope: str, fy: int) -> Optional[dict]:
+    """Dashboard sales widgets for one financial year, month by month (old-year records included).
+    None when the role can't see sales."""
     import json
-    from datetime import date, timedelta
+    from datetime import date
 
     from sqlalchemy import select
 
+    from ..core.fy import current_fy, fy_label, fy_range
     from ..models import Voucher
     from . import dash_charts as dc
 
     if not (actor.can("sales.create") or actor.can("reports.view")):
         return None
     costs = actor.can("costs.view")
-    today = date.today()
-    since = today - timedelta(days=29)
+    start, end = fy_range(fy)
     kinds = ["SALE", "SALE_RETURN"] + (["PURCHASE", "PURCHASE_RETURN"] if costs else [])
     stmt = select(Voucher).where(
-        Voucher.userId == actor.account_id, Voucher.kind.in_(kinds), Voucher.status != "CANCELLED", Voucher.history.is_(False), Voucher.date >= since.isoformat()
+        Voucher.userId == actor.account_id, Voucher.kind.in_(kinds), Voucher.status != "CANCELLED",
+        Voucher.date >= start, Voucher.date <= end,
     )
     if actor.godown_ids is not None:
         stmt = stmt.where(Voucher.godownId.in_(actor.godown_ids))
     if scope != "ALL":
         stmt = stmt.where(Voucher.godownId == scope)
     rows = db.execute(stmt).scalars().all()
-    day_keys = [(since + timedelta(days=i)).isoformat() for i in range(30)]
-    sales = {k: 0.0 for k in day_keys}
-    purch = {k: 0.0 for k in day_keys}
-    profit = {k: 0.0 for k in day_keys}
-    orders = {k: 0.0 for k in day_keys}
+
+    # April .. March
+    keys, labels = [], []
+    for i in range(12):
+        month = (3 + i) % 12 + 1
+        year = fy if month >= 4 else fy + 1
+        keys.append(f"{year}-{month:02d}")
+        labels.append(f"{date(year, month, 1).strftime('%b')} {str(year)[2:]}")
+    sales = {k: 0.0 for k in keys}
+    purch = {k: 0.0 for k in keys}
+    profit = {k: 0.0 for k in keys}
+    orders = {k: 0.0 for k in keys}
     modes: dict[str, float] = {}
     for v in rows:
-        if v.date not in sales:  # future-dated
+        m = v.date[:7]
+        if m not in sales:
             continue
         sg = -1 if v.kind.endswith("_RETURN") else 1
         if v.kind.startswith("SALE"):
-            sales[v.date] += sg * v.total
-            profit[v.date] += sg * (v.subtotal - v.costTotal)
+            sales[m] += sg * v.total
+            profit[m] += sg * (v.subtotal - v.costTotal)
             if sg == 1:
-                orders[v.date] += 1
+                orders[m] += 1
                 try:
                     for r in json.loads(v.paymentSplit or "[]"):
                         modes[r["mode"]] = modes.get(r["mode"], 0.0) + r["amount"]
                 except (ValueError, KeyError, TypeError):
                     pass
         else:
-            purch[v.date] += sg * v.total
+            purch[m] += sg * v.total
     sv, pv, prv, ov = (list(d.values()) for d in (sales, purch, profit, orders))
-    last = day_keys[-days:]
+    today = date.today()
+    elapsed = (((today.year - fy) * 12 + today.month - 3) if fy == current_fy() else 12) or 1  # months so far this year
+    elapsed = max(1, min(12, elapsed))
 
     def tip(vals, pre="", post=""):
-        return [f"{int(k[8:])} {date.fromisoformat(k).strftime('%b')}: {pre}{v:,.0f}{post}" for k, v in zip(day_keys, vals)]
+        return [f"{lab}: {pre}{v:,.0f}{post}" for lab, v in zip(labels, vals)]
 
     mode_items = sorted(modes.items(), key=lambda kv: -kv[1])
     return {
-        "costs": costs,
-        "sales": {"total": sum(sv), "avg": sum(sv) / 30, "spark": dc.spark(sv, "#16a34a", tips=tip(sv, "₹"))},
-        "profit": {"total": sum(prv), "avg": sum(prv) / 30, "spark": dc.spark(prv, "var(--brand)", tips=tip(prv, "₹"))} if costs else None,
-        "orders": {"total": int(sum(ov)), "avg": sum(ov) / 30, "spark": dc.spark(ov, "#dc2626", tips=tip(ov, "", " orders"))},
-        "bars": dc.bars([f"{int(k[8:])} {date.fromisoformat(k).strftime('%b')}" for k in last], [sales[k] for k in last],
-                        [purch[k] for k in last] if costs else None),
-        "days": days, "hasBars": any(sales[k] or purch[k] for k in last),
+        "costs": costs, "fy": fy, "fyLabel": fy_label(fy), "elapsed": elapsed,
+        "sales": {"total": sum(sv), "avg": sum(sv) / elapsed, "spark": dc.spark(sv, "#16a34a", tips=tip(sv, "₹"))},
+        "profit": {"total": sum(prv), "avg": sum(prv) / elapsed, "spark": dc.spark(prv, "var(--brand)", tips=tip(prv, "₹"))} if costs else None,
+        "orders": {"total": int(sum(ov)), "avg": sum(ov) / elapsed, "spark": dc.spark(ov, "#dc2626", tips=tip(ov, "", " orders"))},
+        "bars": dc.bars(labels, sv, pv if costs else None),
+        "hasBars": any(sv) or any(pv),
         "donut": dc.donut([v for _, v in mode_items], labels=[m for m, _ in mode_items]),
         "modes": [{"mode": m, "value": v, "color": dc.DONUT[i % len(dc.DONUT)]} for i, (m, v) in enumerate(mode_items)],
         "modeTotal": sum(v for _, v in mode_items),
     }
-
 
 
 @router.get("/app")
@@ -142,7 +152,7 @@ def dashboard(request: Request, scope: str = "ALL"):
         scope = _scope(ws, scope)
         today = today_iso()
         ledger = stock.list_ledger(db, actor, {})
-        panel = _sales_panel(db, actor, scope)
+        panel = _sales_panel(db, actor, scope, selected_fy(request))
     rows = _rows(ws, scope)
     costs = actor.can("costs.view")
     value = round2(sum(r["qty"] * r["purchasePrice"] for r in rows)) if costs else None

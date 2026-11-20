@@ -146,3 +146,16 @@ def test_web_form_creates_an_old_year_record(client):
     assert r.status_code == 303, r.text
     v = client.get("/api/vouchers?q=OLD-77").json()[0]
     assert v["history"] is True and v["paid"] == 3780 and stock(client, item["id"], g) == 20
+
+
+def test_dashboard_follows_the_financial_year(client):
+    g, item, party = world(client)
+    client.post("/api/vouchers", json=bill(g, item, party, history=True, oldNumber="OLD-45"))  # 9,450 in the old year
+    client.post("/api/vouchers", json=bill(g, item, party, date=date.today().isoformat(), qty=1))  # 1,890 this year
+    cur = client.get("/app").text
+    assert f"FY {fy_label(CUR)}" in cur and "1,890" in cur and "9,450" not in cur
+    client.post("/app/fy", data={"fy": str(OLD_FY), "next": "/app"})
+    old = client.get("/app").text
+    assert f"FY {fy_label(OLD_FY)}" in old and "9,450" in old and "1,890" not in old
+    assert f"Sep {str(OLD_FY)[2:]}" in old  # the month the old bill is dated in, on the monthly chart
+    assert "Stock right now" in old  # stock figures are today's, whatever year is selected

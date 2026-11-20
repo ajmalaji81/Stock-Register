@@ -3,31 +3,32 @@
 {% block content %}
 <div class="card welcome" id="welcome">
   <div><h1 style="margin:0 0 2px">Welcome back, {{ actor.name.split(' ')[0] }} 👋</h1>
-    <span class="muted">Here's how your business is doing over the last 30 days.</span></div>
+    <span class="muted">Here's how your business is doing in <b>FY {{ panel.fyLabel if panel else fy.label }}</b>. Change the financial year next to your profile.</span></div>
   <button type="button" class="x" aria-label="Dismiss" onclick="document.getElementById('welcome').remove()">✕</button>
 </div>
 {% include "stock/_scope.html" %}
 {% if panel %}
 <div class="grid kpis">
   {% if panel.profit %}<div class="card kpi"><div class="kh">Profit <span class="dots">···</span></div>
-    <b>{{ panel.profit.total|inr }}</b><div class="kf"><small class="muted">Avg. profit/day {{ panel.profit.avg|inr }}</small>{{ panel.profit.spark }}</div></div>{% endif %}
+    <b>{{ panel.profit.total|inr }}</b><div class="kf"><small class="muted">Avg. profit/month {{ panel.profit.avg|inr }}</small>{{ panel.profit.spark }}</div></div>{% endif %}
   <div class="card kpi"><div class="kh">Total sales <span class="dots">···</span></div>
-    <b>{{ panel.sales.total|inr }}</b><div class="kf"><small class="muted">Avg. sales/day {{ panel.sales.avg|inr }}</small>{{ panel.sales.spark }}</div></div>
+    <b>{{ panel.sales.total|inr }}</b><div class="kf"><small class="muted">Avg. sales/month {{ panel.sales.avg|inr }}</small>{{ panel.sales.spark }}</div></div>
   <div class="card kpi"><div class="kh">Total orders <span class="dots">···</span></div>
-    <b>{{ panel.orders.total }}</b><div class="kf"><small class="muted">Avg. orders/day {{ '%.1f'|format(panel.orders.avg) }}</small>{{ panel.orders.spark }}</div></div>
+    <b>{{ panel.orders.total }}</b><div class="kf"><small class="muted">Avg. orders/month {{ '%.1f'|format(panel.orders.avg) }}</small>{{ panel.orders.spark }}</div></div>
 </div>
 <div class="two">
-  <div class="card"><div class="ch"><div><h2>Sales analytics</h2><span class="muted">Last {{ panel.days }} days{% if panel.costs %} · sales vs purchases{% endif %}</span></div>
-    <a class="btn ghost sm" href="/app/billing/reports">Full report</a></div>
+  <div class="card"><div class="ch"><div><h2>Sales analytics</h2><span class="muted">FY {{ panel.fyLabel }}, month by month{% if panel.costs %} · sales vs purchases{% endif %}</span></div>
+    <a class="btn ghost sm" href="/app/billing/reports">Full report for FY {{ panel.fyLabel }}</a></div>
     {% if panel.hasBars %}{{ panel.bars }}
     <div class="legend"><span><i style="background:var(--brand)"></i>Sales</span>{% if panel.costs %}<span><i style="background:var(--brand-pale)"></i>Purchases</span>{% endif %}</div>
-    {% else %}<p class="muted">No bills in this period yet.</p>{% endif %}</div>
-  <div class="card"><div class="ch"><div><h2>Payment modes</h2><span class="muted">Collected, last 30 days</span></div></div>
+    {% else %}<p class="muted">No bills in this financial year yet.</p>{% endif %}</div>
+  <div class="card"><div class="ch"><div><h2>Payment modes</h2><span class="muted">Collected in FY {{ panel.fyLabel }}</span></div></div>
     {% if panel.modes %}<div class="stat" style="margin-bottom:6px"><b>{{ panel.modeTotal|inr }}</b></div>{{ panel.donut }}
     <ul class="mlist">{% for m in panel.modes %}<li><i style="background:{{ m.color }}"></i>{{ m.mode }}<b>{{ m.value|inr }}</b></li>{% endfor %}</ul>
     {% else %}<p class="muted">No payments recorded yet.</p>{% endif %}</div>
 </div>
 {% endif %}
+<p class="muted" style="margin:0 0 6px">Stock right now (not tied to the financial year)</p>
 <div class="grid">
   <div class="card stat"><span class="muted">Items</span><b>{{ rows|length }}</b></div>
   {% if costs %}<div class="card stat"><span class="muted">Stock value</span><b>{{ value|inr }}</b></div>{% endif %}
