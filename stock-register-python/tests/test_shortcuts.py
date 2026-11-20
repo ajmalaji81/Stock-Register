@@ -70,3 +70,12 @@ def test_receipt_page_needs_login_and_the_payments_permission(client):
     assert seller.get("/app/payments/new").status_code == 200  # the Sales role records receipts
     anon = TestClient(create_app())
     assert anon.get("/app/payments/new", follow_redirects=False).status_code == 303
+
+
+def test_sales_and_purchase_menu_items_show_their_new_bill_keys(client):
+    signup(client)
+    by_id = shortcut_ids(client.get("/app").text)
+    assert (by_id["sales.new"]["nav"], by_id["sales.new"]["url"]) == ("sales", "/app/billing/new?kind=SALE")
+    assert (by_id["purchase.new"]["nav"], by_id["purchase.new"]["url"]) == ("purchases", "/app/billing/new?kind=PURCHASE")
+    assert by_id["quote.new"]["nav"] == "documents"
+    assert client.get("/app/billing/new?kind=SALE").status_code == 200 and client.get("/app/billing/new?kind=PURCHASE").status_code == 200

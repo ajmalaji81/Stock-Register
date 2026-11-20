@@ -203,7 +203,7 @@
     document.querySelectorAll(".side a[data-nav]").forEach(function (link) {
       var old = link.querySelector(".sk"); if (old) old.remove();
       var a = actions.filter(function (x) { return x.nav === link.dataset.nav; })[0];
-      if (a && eff[a.id]) { var s = document.createElement("kbd"); s.className = "sk"; s.textContent = eff[a.id]; link.appendChild(s); }
+      if (a && eff[a.id]) { var s = document.createElement("kbd"); s.className = "sk"; s.textContent = eff[a.id]; s.title = eff[a.id] + ": " + a.label.toLowerCase(); link.appendChild(s); }
     });
     if (openBtn) openBtn.title = "Keyboard shortcuts (" + (eff.help || "off") + ")";
   }

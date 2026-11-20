@@ -56,11 +56,11 @@ NAV: list[tuple[str, str, str, str, list[str], str]] = [
 #: id, label, group, url (None = done in the browser), any-of permissions ([] = everyone), default key, sidebar item it also labels.
 #: Defaults avoid the browser's own keys (Ctrl+T/N/W/R/P/S..., Alt+D/F/E). People can change every one of them (static/shortcuts.js).
 SHORTCUTS: list[tuple[str, str, str, Optional[str], list[str], str, str]] = [
-    ("sales.new", "Add sales invoice", "Create", "/app/billing/new?kind=SALE", ["sales.create"], "Alt+S", ""),
-    ("purchase.new", "Add purchase bill", "Create", "/app/billing/new?kind=PURCHASE", ["purchases.create"], "Alt+P", ""),
+    ("sales.new", "Add sales invoice", "Create", "/app/billing/new?kind=SALE", ["sales.create"], "Alt+S", "sales"),
+    ("purchase.new", "Add purchase bill", "Create", "/app/billing/new?kind=PURCHASE", ["purchases.create"], "Alt+P", "purchases"),
     ("receipt.new", "Add receipt (money in)", "Create", "/app/payments/new?direction=IN", ["payments.manage"], "Alt+R", ""),
     ("payment.new", "Add payment (money out)", "Create", "/app/payments/new?direction=OUT", ["payments.manage"], "Alt+Y", ""),
-    ("quote.new", "Add quotation", "Create", "/app/billing/new?kind=QUOTATION", ["documents.manage"], "Alt+Q", ""),
+    ("quote.new", "Add quotation", "Create", "/app/billing/new?kind=QUOTATION", ["documents.manage"], "Alt+Q", "documents"),
     ("dashboard", "Dashboard", "Go to", "/app", [], "Alt+H", "dashboard"),
     ("items", "Items", "Go to", "/app/items", [], "Alt+I", "items"),
     ("ledger", "Stock ledger", "Go to", "/app/ledger", ["reports.view", "stock.move"], "Alt+L", "ledger"),
