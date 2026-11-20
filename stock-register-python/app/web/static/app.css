@@ -315,3 +315,15 @@ html:not([data-ws=on]) .side a.nav-ws{display:none}
 .ptabs .seg a{padding:6px 14px;border-radius:9px;text-decoration:none;color:inherit;font-weight:600;font-size:13px}
 .ptabs .seg a.on{background:var(--paper);box-shadow:0 1px 3px rgb(0 0 0/.18);color:var(--brand-dark)}
 .pnav{display:flex;align-items:center;gap:8px}.pnav select{padding:5px 8px;font-weight:600;width:auto}.ptitle{font-size:14px}
+
+/* ---- collapsible sidebar groups ---- */
+.navgrp{display:block}
+button.grp{display:flex;width:100%;align-items:center;justify-content:space-between;gap:6px;background:none;border:0;cursor:pointer;font:inherit;
+  font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#667085;margin:14px 0 3px;padding:4px 8px;border-radius:8px;text-align:left}
+button.grp:hover{color:var(--brand-dark);background:#f1f5ff}
+html[data-theme=dark] button.grp{color:#98a2b3}html[data-theme=dark] button.grp:hover{color:#fff;background:#242a37}
+button.grp .chev{width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s}
+.navgrp.collapsed .chev{transform:rotate(-45deg)}
+.navgrp.collapsed .navitems{display:none}
+.navitems{display:flex;flex-direction:column;gap:2px}
+@media(max-width:760px){.navgrp,.navitems{display:contents}button.grp{display:none}}

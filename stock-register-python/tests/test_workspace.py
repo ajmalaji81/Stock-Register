@@ -30,3 +30,13 @@ def test_asset_urls_carry_a_version(client):
     assert re.search(r'/static/app\.css\?v=[0-9a-f]{10}"', html) and re.search(r'/static/theme\.js\?v=[0-9a-f]{10}"', html)
     url = re.search(r'(/static/app\.css\?v=[0-9a-f]{10})', html).group(1)
     assert client.get(url).status_code == 200
+
+
+def test_sidebar_groups_can_be_hidden_and_shown(client):
+    signup(client)
+    page = client.get("/app").text
+    for group in ("Stock", "Billing", "Money", "Reports", "Business"):
+        assert f'data-group="{group}"' in page
+    assert page.count('class="grp" aria-expanded="true"') >= 4 and "/static/nav.js?v=" in page
+    js = client.get("/static/nav.js").text
+    assert "gb-nav-collapsed" in js and "a.on" in js  # remembered per browser; the current page's group never hides
