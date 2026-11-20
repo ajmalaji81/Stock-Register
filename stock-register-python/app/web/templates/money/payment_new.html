@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New receipt' if direction == 'IN' else 'New payment' }} — GodownBook{% endblock %}
+{% block content %}
+<h1>{{ 'Add receipt (money received)' if direction == 'IN' else 'Add payment (money paid out)' }}</h1>
+<form class="card" method="post" action="/app/payments">
+  <input type="hidden" name="direction" value="{{ direction }}">
+  <div class="row">
+    <label>{{ 'Received from' if direction == 'IN' else 'Paid to' }}
+      <select name="partyId" data-search required>
+        <option value="">Choose a {{ 'customer' if direction == 'IN' else 'supplier' }}…</option>
+        {% for p in parties %}<option value="{{ p.id }}">{{ p.name }}{% if p.phone %} · {{ p.phone }}{% endif %}</option>{% endfor %}
+      </select></label>
+    <label>Amount<input name="amount" type="number" step="0.01" min="0.01" required autofocus></label>
+    <label>Mode<select name="mode">{% for m in modes %}<option>{{ m }}</option>{% endfor %}</select></label>
+    <label>Date<input name="date" type="date" value="{{ today }}"></label>
+  </div>
+  <div class="row">
+    <label>Reference<input name="reference" maxlength="60" placeholder="Cheque / UPI / transaction no."></label>
+    <label>Notes<input name="notes" maxlength="200"></label>
+    <button class="btn">{{ 'Record receipt' if direction == 'IN' else 'Record payment' }}</button>
+  </div>
+  <p class="muted" style="margin:6px 0 0">{{ 'Reduces what the customer owes you.' if direction == 'IN' else 'Reduces what you owe the supplier.' }}
+    You can also record it from the party's page. <a href="/app/payments/new?direction={{ 'OUT' if direction == 'IN' else 'IN' }}">Switch to {{ 'a payment' if direction == 'IN' else 'a receipt' }}</a>.</p>
+</form>
+{% endblock %}

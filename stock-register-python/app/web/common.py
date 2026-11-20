@@ -53,6 +53,37 @@ NAV: list[tuple[str, str, str, str, list[str], str]] = [
 ]
 
 
+#: id, label, group, url (None = done in the browser), any-of permissions ([] = everyone), default key, sidebar item it also labels.
+#: Defaults avoid the browser's own keys (Ctrl+T/N/W/R/P/S..., Alt+D/F/E). People can change every one of them (static/shortcuts.js).
+SHORTCUTS: list[tuple[str, str, str, Optional[str], list[str], str, str]] = [
+    ("sales.new", "Add sales invoice", "Create", "/app/billing/new?kind=SALE", ["sales.create"], "Alt+S", ""),
+    ("purchase.new", "Add purchase bill", "Create", "/app/billing/new?kind=PURCHASE", ["purchases.create"], "Alt+P", ""),
+    ("receipt.new", "Add receipt (money in)", "Create", "/app/payments/new?direction=IN", ["payments.manage"], "Alt+R", ""),
+    ("payment.new", "Add payment (money out)", "Create", "/app/payments/new?direction=OUT", ["payments.manage"], "Alt+Y", ""),
+    ("quote.new", "Add quotation", "Create", "/app/billing/new?kind=QUOTATION", ["documents.manage"], "Alt+Q", ""),
+    ("dashboard", "Dashboard", "Go to", "/app", [], "Alt+H", "dashboard"),
+    ("items", "Items", "Go to", "/app/items", [], "Alt+I", "items"),
+    ("ledger", "Stock ledger", "Go to", "/app/ledger", ["reports.view", "stock.move"], "Alt+L", "ledger"),
+    ("serials", "IMEI tracking", "Go to", "/app/serials", ["reports.view", "sales.create", "purchases.create", "stock.move"], "Alt+M", "serials"),
+    ("parties", "Parties", "Go to", "/app/parties", ["parties.manage", "payments.manage"], "Alt+A", "parties"),
+    ("expenses", "Expenses", "Go to", "/app/expenses", ["expenses.manage"], "Alt+X", "expenses"),
+    ("approvals", "Branch approvals", "Go to", "/app/billing/approvals", ["branch.approve"], "Alt+B", "approvals"),
+    ("workspace", "Multi-tab workspace", "Go to", "/app/workspace", [], "Alt+W", "workspace"),
+    ("stock.report", "Stock report", "Reports", "/app/reports", ["reports.view"], "Alt+K", "reports"),
+    ("bill.report", "Sales & GST report", "Reports", "/app/billing/reports", ["reports.view"], "Alt+G", "billreports"),
+    ("search", "Search invoices", "General", None, [], "Alt+/", ""),
+    ("help", "Show / edit shortcuts", "General", None, [], "F1", ""),
+]
+
+
+def shortcuts_for(actor: Actor) -> list[dict]:
+    """The shortcuts this person may use (a clerk without purchase rights never sees "Add purchase bill")."""
+    return [
+        {"id": i, "label": label, "group": group, "url": url, "key": key, "nav": nav}
+        for i, label, group, url, perms, key, nav in SHORTCUTS if not perms or any(actor.can(p) for p in perms)
+    ]
+
+
 class LoginRedirect(Exception):
     """Raised by page_actor when nobody is signed in; main.py turns it into a redirect to /login."""
 
@@ -116,7 +147,7 @@ def render(request: Request, name: str, actor: Optional[Actor] = None, active: s
     base: dict[str, Any] = {
         "request": request, "actor": actor, "active": active, "flash": flash,
         "nav": nav_for(actor) if actor else [], "states": INDIAN_STATES, "kind_label": KIND_LABEL,
-        "fy": fy_context(request),
+        "fy": fy_context(request), "sc_actions": shortcuts_for(actor) if actor else [],
     }
     if actor:
         o = actor.owner

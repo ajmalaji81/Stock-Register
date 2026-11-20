@@ -154,6 +154,27 @@ def party_ledger_csv(party_id: str, request: Request, frm: str = "", to: str = "
     return Response(to_csv(rows), media_type="text/csv", headers={"content-disposition": f'attachment; filename="ledger-{party_id}.csv"'})
 
 
+@router.get("/app/payments/new")
+def payment_new(request: Request, direction: str = "IN"):
+    """A direct form for a receipt (money in) or payment (money out): the keyboard shortcuts open it."""
+    from sqlalchemy import select
+
+    from ..models import Party
+
+    direction = "OUT" if direction == "OUT" else "IN"
+    with session_scope() as db:
+        actor = page_actor(db, request)
+        need(actor, "payments.manage")
+        kinds = ["SUPPLIER", "BOTH"] if direction == "OUT" else ["CUSTOMER", "BOTH"]
+        rows = db.execute(
+            select(Party.id, Party.name, Party.phone).where(
+                Party.userId == actor.account_id, Party.type.in_(kinds), Party.linkedGodownId.is_(None)  # own godowns aren't paid
+            ).order_by(Party.name)
+        ).all()
+        return render(request, "money/payment_new.html", actor, "parties", direction=direction, modes=PAYMENT_MODES, today=today_iso(),
+                      parties=[{"id": r.id, "name": r.name, "phone": r.phone} for r in rows])
+
+
 @router.post("/app/payments")
 def payment_create(request: Request, partyId: str = Form(""), direction: str = Form("IN"), amount: str = Form("0"), mode: str = Form("CASH"),
                    date: str = Form(""), reference: str = Form(""), notes: str = Form("")):

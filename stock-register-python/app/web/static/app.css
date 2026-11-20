@@ -331,3 +331,19 @@ button.grp .chev{width:7px;height:7px;border-right:2px solid currentColor;border
 .side.nonav .navitems,.side.nonav .chev{transition:none}  /* no animation while the saved state is applied on page load */
 button.grp .chev{transition:transform .18s ease}
 @media(max-width:760px){.navgrp,.navitems,.navinner{display:contents}button.grp{display:none}.navgrp.collapsed .navinner{visibility:visible}.navgrp.collapsed .navitems{opacity:1}}
+
+/* ---- keyboard shortcuts ---- */
+.sk{margin-left:auto;font:600 10px/1 ui-monospace,Consolas,monospace;padding:3px 5px;border-radius:5px;border:1px solid var(--line);background:var(--paper);color:#667085;white-space:nowrap}
+html[data-theme=dark] .sk{background:#242a37;color:#98a2b3}
+.side a .sk{opacity:.85}
+.sc-open{margin:10px 8px 0;width:calc(100% - 16px)}
+.sc-card{width:min(640px,100%)}
+.sc-list{overflow:auto;max-height:55vh;margin-top:8px}
+.sc-list h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#667085;margin:12px 0 4px}
+.sc-row{display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line)}
+.sc-row .lab{flex:1;min-width:0}
+.sc-row kbd{font:700 12px/1 ui-monospace,Consolas,monospace;padding:4px 7px;border-radius:6px;border:1px solid var(--line);background:var(--muted);min-width:64px;text-align:center}
+.sc-row kbd.none{opacity:.5;font-weight:500}
+.sc-row.cap kbd{outline:2px solid var(--brand);background:var(--soft)}
+.sc-msg{min-height:1.3em;font-weight:600;margin:6px 0 0}.sc-msg.bad{color:var(--out)}.sc-msg.ok{color:var(--in)}
+@media(max-width:760px){.sc-open{display:none}.sk{display:none}}

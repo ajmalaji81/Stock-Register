@@ -81,6 +81,7 @@
     var q = search.querySelector("input").value;
     active.frame.src = search.getAttribute("action") + "?q=" + encodeURIComponent(q); show(active);
   });
+  window.gbWorkspaceOpen = function (url) { active.frame.src = url; show(active); };  // used by the keyboard shortcuts
   document.getElementById("ws-add").addEventListener("click", function () { open("/app"); });
   document.addEventListener("keydown", function (e) {
     if (e.altKey && /^[1-8]$/.test(e.key) && tabs[+e.key - 1]) { e.preventDefault(); show(tabs[+e.key - 1]); }

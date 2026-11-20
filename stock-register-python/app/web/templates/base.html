@@ -24,10 +24,11 @@
     <div class="navgrp" data-group="{{ g.group }}">
       <button type="button" class="grp" aria-expanded="true" aria-controls="ng-{{ loop.index }}">{{ g.group }}<span class="chev" aria-hidden="true"></span></button>
       <div class="navitems" id="ng-{{ loop.index }}"><div class="navinner">
-      {% for n in g['items'] %}<a href="{{ n.href }}" class="{{ 'on' if n.key == active }}{{ ' nav-ws' if n.key == 'workspace' }}"><span>{{ n.icon }}</span> {{ n.label }}</a>{% endfor %}
+      {% for n in g['items'] %}<a href="{{ n.href }}" data-nav="{{ n.key }}" class="{{ 'on' if n.key == active }}{{ ' nav-ws' if n.key == 'workspace' }}"><span>{{ n.icon }}</span> {{ n.label }}</a>{% endfor %}
       </div></div>
     </div>
     {% endfor %}
+    <button type="button" class="btn ghost sm sc-open" id="sc-open" title="Keyboard shortcuts (F1)">⌨ Shortcuts</button>
     <div class="who">
       <b>{{ actor.name }}</b><br><small>{{ role_label }} · {{ plan }}{% if plan == 'TRIAL' %} ({{ trial_days }}d left){% endif %}</small>
       {% if plan != 'PRO' and actor.can('billing.upgrade') %}<br><a href="/upgrade">Upgrade to Pro</a>{% endif %}
@@ -59,5 +60,19 @@
 {% endblock %}
 <script src="{{ asset('theme.js') }}"></script>
 <script src="{{ asset('nav.js') }}"></script>
+{% if actor %}
+<script type="application/json" id="gb-shortcuts-data">{{ sc_actions|tojson }}</script>
+<div id="sc-modal" class="modal print-hide" hidden><div class="modal-card sc-card" role="dialog" aria-modal="true" aria-labelledby="sc-title">
+  <h2 id="sc-title" style="margin-top:0">Keyboard shortcuts</h2>
+  <p class="muted" style="margin:0">Press a shortcut anywhere in the app. Click <b>Edit</b>, then press the keys you want (Esc cancels, Backspace turns it off). Saved in this browser.</p>
+  <div id="sc-msg" class="sc-msg" role="status" aria-live="polite"></div>
+  <div id="sc-list" class="sc-list"></div>
+  <div class="row" style="justify-content:space-between;margin-top:10px">
+    <button type="button" class="btn ghost" id="sc-reset-all" style="flex:0;white-space:nowrap">Reset all to default</button>
+    <button type="button" class="btn" id="sc-close" style="flex:0">Close</button>
+  </div>
+</div></div>
+<script src="{{ asset('shortcuts.js') }}"></script>
+{% endif %}
 </body>
 </html>
