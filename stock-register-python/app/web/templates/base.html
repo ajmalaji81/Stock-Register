@@ -23,9 +23,9 @@
     {% for g in nav %}
     <div class="navgrp" data-group="{{ g.group }}">
       <button type="button" class="grp" aria-expanded="true" aria-controls="ng-{{ loop.index }}">{{ g.group }}<span class="chev" aria-hidden="true"></span></button>
-      <div class="navitems" id="ng-{{ loop.index }}">
+      <div class="navitems" id="ng-{{ loop.index }}"><div class="navinner">
       {% for n in g['items'] %}<a href="{{ n.href }}" class="{{ 'on' if n.key == active }}{{ ' nav-ws' if n.key == 'workspace' }}"><span>{{ n.icon }}</span> {{ n.label }}</a>{% endfor %}
-      </div>
+      </div></div>
     </div>
     {% endfor %}
     <div class="who">

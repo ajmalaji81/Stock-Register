@@ -7,6 +7,8 @@
   var read = function () { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; } };
   var write = function (list) { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) {} };
   var collapsed = read();
+  var side = document.querySelector(".side");
+  side.classList.add("nonav");  // no slide while the saved state is applied
 
   function set(g, hide) {
     g.classList.toggle("collapsed", hide);
@@ -24,6 +26,7 @@
       write(list);
     });
   });
+  requestAnimationFrame(function () { requestAnimationFrame(function () { side.classList.remove("nonav"); }); });
   window.addEventListener("storage", function (e) {  // another tab / the workspace changed it
     if (e.key !== KEY) return;
     var list = read();

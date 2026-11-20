@@ -40,3 +40,11 @@ def test_sidebar_groups_can_be_hidden_and_shown(client):
     assert page.count('class="grp" aria-expanded="true"') >= 4 and "/static/nav.js?v=" in page
     js = client.get("/static/nav.js").text
     assert "gb-nav-collapsed" in js and "a.on" in js  # remembered per browser; the current page's group never hides
+
+
+def test_sidebar_groups_animate(client):
+    signup(client)
+    assert client.get("/app").text.count('class="navinner"') >= 4
+    css = client.get("/static/app.css").text
+    assert "grid-template-rows:0fr" in css and "transition:grid-template-rows" in css and ".side.nonav" in css
+    assert "nonav" in client.get("/static/nav.js").text

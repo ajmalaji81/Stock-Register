@@ -324,6 +324,10 @@ button.grp:hover{color:var(--brand-dark);background:#f1f5ff}
 html[data-theme=dark] button.grp{color:#98a2b3}html[data-theme=dark] button.grp:hover{color:#fff;background:#242a37}
 button.grp .chev{width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s}
 .navgrp.collapsed .chev{transform:rotate(-45deg)}
-.navgrp.collapsed .navitems{display:none}
-.navitems{display:flex;flex-direction:column;gap:2px}
-@media(max-width:760px){.navgrp,.navitems{display:contents}button.grp{display:none}}
+.navitems{display:grid;grid-template-rows:1fr;opacity:1;transition:grid-template-rows .18s ease,opacity .15s ease}
+.navinner{min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:2px}
+.navgrp.collapsed .navitems{grid-template-rows:0fr;opacity:0}
+.navgrp.collapsed .navinner{visibility:hidden;transition:visibility 0s .18s}  /* hidden links can't be tabbed to once closed */
+.side.nonav .navitems,.side.nonav .chev{transition:none}  /* no animation while the saved state is applied on page load */
+button.grp .chev{transition:transform .18s ease}
+@media(max-width:760px){.navgrp,.navitems,.navinner{display:contents}button.grp{display:none}.navgrp.collapsed .navinner{visibility:visible}.navgrp.collapsed .navitems{opacity:1}}
