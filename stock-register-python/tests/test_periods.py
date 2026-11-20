@@ -83,3 +83,18 @@ def test_dashboard_tabs_and_navigation(client):
     assert "/app/billing/reports?from=" in home
     assert "FY " in client.get("/app?view=quarter").text and "Q" in client.get("/app?view=quarter").text
     assert client.get("/app?view=month&p=junk").status_code == 200  # falls back, never an error
+
+
+def test_welcome_message_shows_once_after_login(client):
+    signup(client)  # the API signup sets no welcome flag
+    assert "Welcome back" not in client.get("/app").text
+    client.post("/logout")
+    r = client.post("/login", data={"email": "owner@example.com", "password": "password123"}, follow_redirects=False)
+    assert r.status_code == 303
+    first = client.get("/app")
+    assert "Welcome back, Owner" in first.text and "how your business is doing" in first.text
+    assert "Welcome back" not in client.get("/app").text  # not on the next visit
+    assert "Welcome back" not in client.get("/app?view=week").text
+    client.post("/logout")
+    client.post("/login", data={"email": "owner@example.com", "password": "password123"}, follow_redirects=False)
+    assert "Welcome back" in client.get("/app").text  # a new login greets again

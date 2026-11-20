@@ -147,11 +147,15 @@ def dashboard(request: Request, scope: str = "ALL", view: str = "month", p: str 
     costs = actor.can("costs.view")
     value = round2(sum(r["qty"] * r["purchasePrice"] for r in rows)) if costs else None
     scoped = [e for e in ledger if scope == "ALL" or e["godownId"] == scope]
-    return render(
+    welcome = bool(request.cookies.get("sr_welcome"))  # set at login; shown on the first dashboard view only
+    res = render(
         request, "stock/dashboard.html", actor, "dashboard", ws=ws, scope=scope, rows=rows, costs=costs, value=value,
         low=[r for r in rows if r["low"]], today=summarize_today(ledger, today, scope), recent=list(reversed(scoped))[:10], panel=panel,
-        per=per, view_labels=periods.VIEW_LABEL, month_options=periods.months_of_fy(per.fy),
+        per=per, view_labels=periods.VIEW_LABEL, month_options=periods.months_of_fy(per.fy), welcome=welcome,
     )
+    if welcome:
+        res.delete_cookie("sr_welcome", path="/")
+    return res
 
 
 # ---------------- items ----------------

@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Dashboard · GodownBook{% endblock %}
 {% block content %}
+{% if welcome %}
 <div class="card welcome" id="welcome">
   <div><h1 style="margin:0 0 2px">Welcome back, {{ actor.name.split(' ')[0] }} 👋</h1>
     <span class="muted">Here's how your business is doing: <b>{{ per.title }}</b>.</span></div>
   <button type="button" class="x" aria-label="Dismiss" onclick="document.getElementById('welcome').remove()">✕</button>
 </div>
+{% endif %}
 {% include "stock/_scope.html" %}
 {% set q = '&scope=' ~ scope %}
 <div class="ptabs print-hide">

@@ -89,6 +89,7 @@ def login_submit(request: Request, email: str = Form(""), password: str = Form("
         return fail("Wrong email or password", 401)
     res = redirect("/app")
     start_session(res, target[0], target[2])
+    res.set_cookie("sr_welcome", "1", max_age=3600, httponly=True, samesite="lax", path="/")  # the dashboard greets once, then clears it
     return res
 
 
@@ -209,6 +210,7 @@ def signup_submit(request: Request, name: str = Form(""), email: str = Form(""),
         uid = user.id
     res = redirect("/app")
     start_session(res, uid)
+    res.set_cookie("sr_welcome", "1", max_age=3600, httponly=True, samesite="lax", path="/")
     return res
 
 
