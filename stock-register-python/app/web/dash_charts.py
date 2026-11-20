@@ -58,7 +58,8 @@ def _nice_max(v: float) -> float:
     return 10 * mag
 
 
-def bars(labels: list[str], a: list[float], b: list[float] | None = None, w: int = 640, h: int = 270) -> Markup:
+def bars(labels: list[str], a: list[float], b: list[float] | None = None, w: int = 640, h: int = 270,
+         tip_labels: list[str] | None = None) -> Markup:
     """Grouped vertical bars: a = dark blue (sales), b = light blue (purchases)."""
     left, bottom, top = 54, 28, 10
     ph = h - bottom - top
@@ -71,7 +72,10 @@ def bars(labels: list[str], a: list[float], b: list[float] | None = None, w: int
     n = len(labels)
     slot = (w - left) / max(n, 1)
     bw = min(16, slot / 3)
+    tip_labels = tip_labels or labels
+    every = 1 if n <= 16 else 2 if n <= 31 else 3  # keep the day numbers of a long month readable
     for i, lab in enumerate(labels):
+        full = tip_labels[i]
         cx = left + slot * i + slot / 2
         series = [(BLUE_LIGHT, b[i] if b else None), (BLUE, a[i])] if b else [(BLUE, a[i])]
         x = cx - bw * len(series) / 2
@@ -79,11 +83,11 @@ def bars(labels: list[str], a: list[float], b: list[float] | None = None, w: int
             if v is None:
                 continue
             bh = max(0.0, v / vmax * ph)
-            out.append(f'<rect x="{x:.1f}" y="{top + ph - bh:.1f}" width="{bw - 2:.1f}" height="{bh:.1f}" rx="2" fill="{color}"><title>{escape(lab)}: ₹{v:,.0f}</title></rect>')
+            out.append(f'<rect x="{x:.1f}" y="{top + ph - bh:.1f}" width="{bw - 2:.1f}" height="{bh:.1f}" rx="2" fill="{color}"><title>{escape(full)}: ₹{v:,.0f}</title></rect>')
             x += bw
-        tip = f"{lab}\u2002Sales ₹{a[i]:,.0f}" + (f"\u2002Purchases ₹{b[i]:,.0f}" if b else "")
+        tip = f"{full}\u2002Sales ₹{a[i]:,.0f}" + (f"\u2002Purchases ₹{b[i]:,.0f}" if b else "")
         out.append(f'<rect class="hit" x="{left + slot * i:.1f}" y="{top}" width="{slot:.1f}" height="{ph}" fill="transparent" data-tip="{escape(tip)}"/>')
-        if n <= 16 or i % 2 == 0:
+        if i % every == 0:
             out.append(f'<text x="{cx:.1f}" y="{h - 8}" text-anchor="middle" font-size="11" fill="#667085">{escape(lab)}</text>')
     out.append("</svg>")
     return Markup("".join(out))

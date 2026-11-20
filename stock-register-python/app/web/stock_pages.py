@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .. import schemas as S
 from ..core import bulk_import as BI
+from ..core import periods
 from ..core.engine import is_low_stock, qty_in_scope, summarize_today, to_csv, today_iso
 from ..core.errors import StockError
 from ..core.jsmath import round2
@@ -66,26 +67,24 @@ def _rows(ws: dict, scope: str, q: str = "") -> list[dict]:
 # ---------------- dashboard ----------------
 
 
-def _sales_panel(db, actor, scope: str, fy: int) -> Optional[dict]:
-    """Dashboard sales widgets for one financial year, month by month (old-year records included).
-    None when the role can't see sales."""
+def _sales_panel(db, actor, scope: str, per) -> Optional[dict]:
+    """Dashboard sales widgets for one period (week / month / quarter / year), split into the period's buckets.
+    Old-year records are included. None when the role can't see sales."""
     import json
     from datetime import date
 
     from sqlalchemy import select
 
-    from ..core.fy import current_fy, fy_label, fy_range
     from ..models import Voucher
     from . import dash_charts as dc
 
     if not (actor.can("sales.create") or actor.can("reports.view")):
         return None
     costs = actor.can("costs.view")
-    start, end = fy_range(fy)
     kinds = ["SALE", "SALE_RETURN"] + (["PURCHASE", "PURCHASE_RETURN"] if costs else [])
     stmt = select(Voucher).where(
         Voucher.userId == actor.account_id, Voucher.kind.in_(kinds), Voucher.status != "CANCELLED",
-        Voucher.date >= start, Voucher.date <= end,
+        Voucher.date >= per.start.isoformat(), Voucher.date <= per.end.isoformat(),
     )
     if actor.godown_ids is not None:
         stmt = stmt.where(Voucher.godownId.in_(actor.godown_ids))
@@ -93,50 +92,40 @@ def _sales_panel(db, actor, scope: str, fy: int) -> Optional[dict]:
         stmt = stmt.where(Voucher.godownId == scope)
     rows = db.execute(stmt).scalars().all()
 
-    # April .. March
-    keys, labels = [], []
-    for i in range(12):
-        month = (3 + i) % 12 + 1
-        year = fy if month >= 4 else fy + 1
-        keys.append(f"{year}-{month:02d}")
-        labels.append(f"{date(year, month, 1).strftime('%b')} {str(year)[2:]}")
-    sales = {k: 0.0 for k in keys}
-    purch = {k: 0.0 for k in keys}
-    profit = {k: 0.0 for k in keys}
-    orders = {k: 0.0 for k in keys}
+    where = per.index_by_day()
+    n = len(per.buckets)
+    sv, pv, prv, ov = [0.0] * n, [0.0] * n, [0.0] * n, [0.0] * n
     modes: dict[str, float] = {}
     for v in rows:
-        m = v.date[:7]
-        if m not in sales:
+        i = where.get(v.date)
+        if i is None:
             continue
         sg = -1 if v.kind.endswith("_RETURN") else 1
         if v.kind.startswith("SALE"):
-            sales[m] += sg * v.total
-            profit[m] += sg * (v.subtotal - v.costTotal)
+            sv[i] += sg * v.total
+            prv[i] += sg * (v.subtotal - v.costTotal)
             if sg == 1:
-                orders[m] += 1
+                ov[i] += 1
                 try:
                     for r in json.loads(v.paymentSplit or "[]"):
                         modes[r["mode"]] = modes.get(r["mode"], 0.0) + r["amount"]
                 except (ValueError, KeyError, TypeError):
                     pass
         else:
-            purch[m] += sg * v.total
-    sv, pv, prv, ov = (list(d.values()) for d in (sales, purch, profit, orders))
-    today = date.today()
-    elapsed = (((today.year - fy) * 12 + today.month - 3) if fy == current_fy() else 12) or 1  # months so far this year
-    elapsed = max(1, min(12, elapsed))
+            pv[i] += sg * v.total
+    elapsed = per.elapsed(date.today())
+    labels, tips_l = [b[2] for b in per.buckets], [b[3] for b in per.buckets]
 
     def tip(vals, pre="", post=""):
-        return [f"{lab}: {pre}{v:,.0f}{post}" for lab, v in zip(labels, vals)]
+        return [f"{lab}: {pre}{v:,.0f}{post}" for lab, v in zip(tips_l, vals)]
 
     mode_items = sorted(modes.items(), key=lambda kv: -kv[1])
     return {
-        "costs": costs, "fy": fy, "fyLabel": fy_label(fy), "elapsed": elapsed,
+        "costs": costs, "unit": per.unit, "elapsed": elapsed,
         "sales": {"total": sum(sv), "avg": sum(sv) / elapsed, "spark": dc.spark(sv, "#16a34a", tips=tip(sv, "₹"))},
         "profit": {"total": sum(prv), "avg": sum(prv) / elapsed, "spark": dc.spark(prv, "var(--brand)", tips=tip(prv, "₹"))} if costs else None,
         "orders": {"total": int(sum(ov)), "avg": sum(ov) / elapsed, "spark": dc.spark(ov, "#dc2626", tips=tip(ov, "", " orders"))},
-        "bars": dc.bars(labels, sv, pv if costs else None),
+        "bars": dc.bars(labels, sv, pv if costs else None, tip_labels=tips_l),
         "hasBars": any(sv) or any(pv),
         "donut": dc.donut([v for _, v in mode_items], labels=[m for m, _ in mode_items]),
         "modes": [{"mode": m, "value": v, "color": dc.DONUT[i % len(dc.DONUT)]} for i, (m, v) in enumerate(mode_items)],
@@ -145,14 +134,15 @@ def _sales_panel(db, actor, scope: str, fy: int) -> Optional[dict]:
 
 
 @router.get("/app")
-def dashboard(request: Request, scope: str = "ALL"):
+def dashboard(request: Request, scope: str = "ALL", view: str = "month", p: str = ""):
     with session_scope() as db:
         actor = page_actor(db, request)
         ws = stock.load_workspace(db, actor)
         scope = _scope(ws, scope)
         today = today_iso()
         ledger = stock.list_ledger(db, actor, {})
-        panel = _sales_panel(db, actor, scope, selected_fy(request))
+        per = periods.resolve(view, p, selected_fy(request))
+        panel = _sales_panel(db, actor, scope, per)
     rows = _rows(ws, scope)
     costs = actor.can("costs.view")
     value = round2(sum(r["qty"] * r["purchasePrice"] for r in rows)) if costs else None
@@ -160,6 +150,7 @@ def dashboard(request: Request, scope: str = "ALL"):
     return render(
         request, "stock/dashboard.html", actor, "dashboard", ws=ws, scope=scope, rows=rows, costs=costs, value=value,
         low=[r for r in rows if r["low"]], today=summarize_today(ledger, today, scope), recent=list(reversed(scoped))[:10], panel=panel,
+        per=per, view_labels=periods.VIEW_LABEL, month_options=periods.months_of_fy(per.fy),
     )
 
 

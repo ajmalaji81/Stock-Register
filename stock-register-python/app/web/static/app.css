@@ -308,3 +308,10 @@ html:not([data-ws=on]) .side a.nav-ws{display:none}
 .fy-note{margin:-6px 0 12px;font-size:12.5px}
 .badge.old{background:#fde68a;color:#78350f}
 .hist-box{display:flex;gap:8px;align-items:flex-start;font-size:13px}.hist-box input{width:auto;margin-top:3px}
+
+/* ---- dashboard period tabs ---- */
+.ptabs{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px}
+.ptabs .seg{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:12px;background:var(--muted)}
+.ptabs .seg a{padding:6px 14px;border-radius:9px;text-decoration:none;color:inherit;font-weight:600;font-size:13px}
+.ptabs .seg a.on{background:var(--paper);box-shadow:0 1px 3px rgb(0 0 0/.18);color:var(--brand-dark)}
+.pnav{display:flex;align-items:center;gap:8px}.pnav select{padding:5px 8px;font-weight:600;width:auto}.ptitle{font-size:14px}

@@ -3,26 +3,40 @@
 {% block content %}
 <div class="card welcome" id="welcome">
   <div><h1 style="margin:0 0 2px">Welcome back, {{ actor.name.split(' ')[0] }} 👋</h1>
-    <span class="muted">Here's how your business is doing in <b>FY {{ panel.fyLabel if panel else fy.label }}</b>. Change the financial year next to your profile.</span></div>
+    <span class="muted">Here's how your business is doing: <b>{{ per.title }}</b>.</span></div>
   <button type="button" class="x" aria-label="Dismiss" onclick="document.getElementById('welcome').remove()">✕</button>
 </div>
 {% include "stock/_scope.html" %}
+{% set q = '&scope=' ~ scope %}
+<div class="ptabs print-hide">
+  <div class="seg" role="tablist" aria-label="Dashboard period">
+    {% for v, label in view_labels.items() %}<a role="tab" aria-selected="{{ 'true' if v == per.view }}" class="{{ 'on' if v == per.view }}" href="/app?view={{ v }}{{ q }}">{{ label }}</a>{% endfor %}
+  </div>
+  <div class="pnav">
+    {% if per.prev %}<a class="btn ghost sm" href="/app?view={{ per.view }}&p={{ per.prev }}{{ q }}" title="Previous">‹</a>{% endif %}
+    {% if per.view == 'month' %}<select aria-label="Choose month" onchange="location.href=this.value">
+      {% for m in month_options %}<option value="/app?view=month&p={{ m.p }}{{ q }}" {{ 'selected' if m.p == per.anchor }} {{ 'disabled' if m.future }}>{{ m.label }}</option>{% endfor %}</select>
+    {% else %}<b class="ptitle">{{ per.title }}</b>{% endif %}
+    {% if per.next %}<a class="btn ghost sm" href="/app?view={{ per.view }}&p={{ per.next }}{{ q }}" title="Next">›</a>{% endif %}
+    <a class="btn ghost sm" href="/app?view={{ per.view }}{{ q }}" title="Back to the current {{ per.view }}">Today</a>
+  </div>
+</div>
 {% if panel %}
 <div class="grid kpis">
   {% if panel.profit %}<div class="card kpi"><div class="kh">Profit <span class="dots">···</span></div>
-    <b>{{ panel.profit.total|inr }}</b><div class="kf"><small class="muted">Avg. profit/month {{ panel.profit.avg|inr }}</small>{{ panel.profit.spark }}</div></div>{% endif %}
+    <b>{{ panel.profit.total|inr }}</b><div class="kf"><small class="muted">Avg. profit/{{ panel.unit }} {{ panel.profit.avg|inr }}</small>{{ panel.profit.spark }}</div></div>{% endif %}
   <div class="card kpi"><div class="kh">Total sales <span class="dots">···</span></div>
-    <b>{{ panel.sales.total|inr }}</b><div class="kf"><small class="muted">Avg. sales/month {{ panel.sales.avg|inr }}</small>{{ panel.sales.spark }}</div></div>
+    <b>{{ panel.sales.total|inr }}</b><div class="kf"><small class="muted">Avg. sales/{{ panel.unit }} {{ panel.sales.avg|inr }}</small>{{ panel.sales.spark }}</div></div>
   <div class="card kpi"><div class="kh">Total orders <span class="dots">···</span></div>
-    <b>{{ panel.orders.total }}</b><div class="kf"><small class="muted">Avg. orders/month {{ '%.1f'|format(panel.orders.avg) }}</small>{{ panel.orders.spark }}</div></div>
+    <b>{{ panel.orders.total }}</b><div class="kf"><small class="muted">Avg. orders/{{ panel.unit }} {{ '%.1f'|format(panel.orders.avg) }}</small>{{ panel.orders.spark }}</div></div>
 </div>
 <div class="two">
-  <div class="card"><div class="ch"><div><h2>Sales analytics</h2><span class="muted">FY {{ panel.fyLabel }}, month by month{% if panel.costs %} · sales vs purchases{% endif %}</span></div>
-    <a class="btn ghost sm" href="/app/billing/reports">Full report for FY {{ panel.fyLabel }}</a></div>
+  <div class="card"><div class="ch"><div><h2>Sales analytics</h2><span class="muted">{{ per.title }}, by {{ panel.unit }}{% if panel.costs %} · sales vs purchases{% endif %}</span></div>
+    <a class="btn ghost sm" href="/app/billing/reports?from={{ per.start }}&to={{ per.end }}">Full report</a></div>
     {% if panel.hasBars %}{{ panel.bars }}
     <div class="legend"><span><i style="background:var(--brand)"></i>Sales</span>{% if panel.costs %}<span><i style="background:var(--brand-pale)"></i>Purchases</span>{% endif %}</div>
-    {% else %}<p class="muted">No bills in this financial year yet.</p>{% endif %}</div>
-  <div class="card"><div class="ch"><div><h2>Payment modes</h2><span class="muted">Collected in FY {{ panel.fyLabel }}</span></div></div>
+    {% else %}<p class="muted">No bills in this period.</p>{% endif %}</div>
+  <div class="card"><div class="ch"><div><h2>Payment modes</h2><span class="muted">Collected · {{ per.title }}</span></div></div>
     {% if panel.modes %}<div class="stat" style="margin-bottom:6px"><b>{{ panel.modeTotal|inr }}</b></div>{{ panel.donut }}
     <ul class="mlist">{% for m in panel.modes %}<li><i style="background:{{ m.color }}"></i>{{ m.mode }}<b>{{ m.value|inr }}</b></li>{% endfor %}</ul>
     {% else %}<p class="muted">No payments recorded yet.</p>{% endif %}</div>
