@@ -16,7 +16,7 @@ from ..core.money import (
     BALANCE_SIGN, BalanceParts, CashFlow, LedgerSource, build_party_ledger, party_balance, reminder_message,
     round2, summarize_cash, whatsapp_link,
 )
-from ..models import Expense, Party, PartyPayment, Voucher
+from ..models import AccountVoucher, Expense, Party, PartyPayment, Voucher
 from ..schemas import ExpenseInput, PartyInput, PaymentInput, first_message
 from .activity import iso, log_activity
 from .actor import Actor, assert_can
@@ -24,6 +24,7 @@ from .stock import fmt_num
 
 BALANCE_KINDS = list(BALANCE_SIGN)
 LEDGER_KIND_LABEL = {"SALE": "Sale", "SALE_RETURN": "Sales return", "PURCHASE": "Purchase", "PURCHASE_RETURN": "Purchase return"}
+NOTE_LABEL = {"CREDIT_NOTE": "Credit note", "DEBIT_NOTE": "Debit note"}
 
 
 def _parts(opening: float = 0) -> BalanceParts:
@@ -46,6 +47,18 @@ def balance_parts(db: Session, account_id: str, parties: list[Any]) -> dict[str,
         .where(PartyPayment.userId == account_id, PartyPayment.partyId.in_(ids))
         .group_by(PartyPayment.partyId, PartyPayment.direction)
     ).all()
+    notes = db.execute(
+        select(AccountVoucher.partyId, AccountVoucher.kind, func.sum(AccountVoucher.amount))
+        .where(AccountVoucher.userId == account_id, AccountVoucher.partyId.in_(ids), AccountVoucher.kind.in_(list(NOTE_LABEL)), AccountVoucher.status != "CANCELLED")
+        .group_by(AccountVoucher.partyId, AccountVoucher.kind)
+    ).all()
+    for party_id, kind, total in notes:
+        parts = out.get(party_id)
+        if parts is not None:
+            if kind == "CREDIT_NOTE":
+                parts.credit_note += total or 0
+            else:
+                parts.debit_note += total or 0
     for party_id, kind, total in vouchers:
         parts = out.get(party_id)
         if parts is None:
@@ -176,8 +189,9 @@ def delete_party(db: Session, actor: Actor, party_id: str) -> None:
     pay = db.execute(
         select(func.count()).select_from(PartyPayment).where(PartyPayment.userId == actor.account_id, PartyPayment.partyId == party_id)
     ).scalar_one()
-    if v or pay:
-        raise StockError("This party has bills or payments, so it can't be deleted.", 409)
+    nt = db.execute(select(func.count()).select_from(AccountVoucher).where(AccountVoucher.userId == actor.account_id, AccountVoucher.partyId == party_id)).scalar_one()
+    if v or pay or nt:
+        raise StockError("This party has bills, payments or notes, so it can't be deleted.", 409)
     name = p.name
     db.execute(delete(Party).where(Party.id == party_id))
     db.expire_all()
@@ -262,7 +276,16 @@ def party_ledger(db: Session, actor: Actor, party_id: str, from_: Optional[str] 
         )
     ).scalars().all()
     payments = db.execute(select(PartyPayment).where(PartyPayment.userId == actor.account_id, PartyPayment.partyId == party_id)).scalars().all()
+    notes = db.execute(
+        select(AccountVoucher).where(
+            AccountVoucher.userId == actor.account_id, AccountVoucher.partyId == party_id,
+            AccountVoucher.kind.in_(list(NOTE_LABEL)), AccountVoucher.status != "CANCELLED",
+        )
+    ).scalars().all()
     sources = [
+        LedgerSource(id=n.id, date=n.date, created_at=iso(n.createdAt), kind=n.kind, ref=f"{NOTE_LABEL[n.kind]} #{n.number}", amount=n.amount, notes=n.narration)
+        for n in notes
+    ] + [
         LedgerSource(
             id=v.id, date=v.date, created_at=iso(v.createdAt), kind=v.kind, ref=f"{LEDGER_KIND_LABEL.get(v.kind, v.kind)} #{v.number}",
             amount=v.total, notes=v.notes,

@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% from "display/books_macros.html" import side_tabs, download %}
+{% block title %}Bill receivables / payables · GodownBook{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">Bill {{ 'receivables' if side == 'receivable' else 'payables' }}</h1>{{ download(csv_url) }}</div>
+<div class="card" style="font-size:13px"><b>How outstanding is worked out</b>
+ <ul style="margin:6px 0 0 18px;padding:0">
+  <li>Money received or paid settles bills oldest first (FIFO by bill date).</li>
+  <li>A payment taken together with a bill settles that bill first; any extra goes to the oldest bills.</li>
+  <li>The party's opening balance counts as the oldest bill.</li>
+  <li>{{ 'Credit notes, sales returns and receipts settle bills; debit notes add to what is due.' if side == 'receivable' else 'Debit notes, purchase returns and payments settle bills; credit notes add to what is due.' }}</li>
+  <li>Cancelled bills and old-financial-year records are ignored, like the Parties page. Money left over after all bills are settled shows as an advance.</li>
+ </ul></div>
+{{ side_tabs(side, as_on, '/app/display/bill-outstanding') }}
+<p><b>Total outstanding: {{ total|inr }}</b></p>
+{% for p in parties %}
+<div class="card"><h2 style="margin:0 0 6px"><a href="/app/parties/{{ p.id }}">{{ p.name }}</a> <small class="muted">outstanding {{ p.total|inr }}{% if p.advance %} · advance {{ p.advance|inr }}{% endif %}</small></h2>
+<table><tr><th>Bill</th><th>Date</th><th class="n">Days</th><th class="n">Bill amount</th><th class="n">Settled</th><th class="n">Outstanding</th></tr>
+{% for b in p.bills %}<tr><td>{{ b.ref }}</td><td>{{ b.date or '—' }}</td><td class="n">{{ b.age if b.age is not none else '—' }}</td><td class="n">{{ b.amount|inr }}</td><td class="n">{{ b.settled|inr if b.settled else '—' }}</td><td class="n"><b>{{ b.outstanding|inr }}</b></td></tr>
+{% else %}<tr><td colspan="6" class="muted">No bills outstanding (advance only).</td></tr>{% endfor %}
+</table></div>
+{% else %}<div class="card muted">Nothing outstanding.</div>{% endfor %}
+{% endblock %}

@@ -196,6 +196,7 @@ class VoucherCreateInput(Model):
     godownId: Annotated[str, _check(lambda v: len(v) > 0, "Choose a godown")]
     gstEnabled: bool = True
     placeOfSupply: Text(60) = ""
+    taxType: Annotated[str, _check(lambda v: v in ("", "LOCAL", "IGST"), "Tax type must be Local GST or IGST")] = ""  # "" = decide from the party's state
     notes: Text(500) = ""
     lines: Annotated[list[VoucherLineInput], _check(lambda v: len(v) >= 1, "Add at least one item"), _check(lambda v: len(v) <= 200, "Too many lines")]
     paidNow: Annotated[float, _check(lambda v: 0 <= v <= 1e10, "Must be 0 or more")] = 0

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ label }}s · GodownBook{% endblock %}
+{% block content %}
+{% set lines = kind in line_kinds %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">{{ label }}s</h1>
+ <a class="btn" href="{{ new_url }}">+ New {{ label|lower }}</a></div>
+<form class="card row" method="get"><input type="hidden" name="kind" value="{{ kind }}">
+ <label>From<input type="date" name="frm" value="{{ frm }}"></label><label>To<input type="date" name="to" value="{{ to }}"></label><button class="btn">Filter</button></form>
+<div class="card"><table>
+<tr><th>No.</th><th>Date</th>{% if not lines %}<th>Party</th><th>Account</th>{% endif %}<th>{{ 'Entries' if lines else 'Reason' }}</th><th class="n">Amount</th><th>By</th><th></th></tr>
+{% for r in rows %}<tr {{ 'style=opacity:.55' if r.status == 'CANCELLED' }}>
+ <td><b>{{ r.number }}</b>{% if r.status == 'CANCELLED' %}<br><small class="muted">Cancelled</small>{% endif %}</td><td>{{ r.date }}</td>
+ {% if not lines %}<td>{{ r.party }}</td><td>{{ r.account }}</td>{% endif %}
+ <td>{% if lines %}{% if r.narration %}{{ r.narration }}<br>{% endif %}{% for l in r.lines %}<small class="muted">{{ l.account }}: {{ ('Dr ' ~ (l.debit|inr)) if l.debit else ('Cr ' ~ (l.credit|inr)) }}</small>{{ '<br>'|safe if not loop.last }}{% endfor %}
+  {% else %}{{ r.narration }}{% endif %}</td>
+ <td class="n">{{ r.amount|inr }}</td><td>{{ r.by }}</td>
+ <td>{% if r.status != 'CANCELLED' %}<form class="inline" method="post" action="/app/accounts/vouchers/{{ r.id }}/cancel" onsubmit="return confirm('Cancel {{ r.number }}? Its effect is removed.')"><input type="hidden" name="kind" value="{{ kind }}"><button class="btn ghost sm">Cancel</button></form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="8" class="muted">No {{ label|lower }}s in this period.</td></tr>{% endfor %}
+</table>{% if rows %}<p class="muted">Total (not cancelled): <b>{{ total|inr }}</b></p>{% endif %}</div>
+{% endblock %}

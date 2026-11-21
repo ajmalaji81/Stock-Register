@@ -29,7 +29,13 @@ router = APIRouter()
 GROUPS = {
     "sales": ("Sales", ["SALE", "SALE_RETURN"]),
     "purchases": ("Purchases", ["PURCHASE", "PURCHASE_RETURN"]),
-    "documents": ("Quotes & orders", ["QUOTATION", "SALES_ORDER", "PURCHASE_ORDER", "CHALLAN"]),
+    "documents": ("Quotes & orders", ["QUOTATION", "SALES_ORDER", "PURCHASE_ORDER", "CHALLAN", "PURCHASE_QUOTATION"]),
+}
+#: The sidebar row that lights up for each kind (a page for one kind is shown under its own menu item).
+KIND_ACTIVE = {
+    "SALE": "sales", "SALE_RETURN": "sale_return", "PURCHASE": "purchases", "PURCHASE_RETURN": "purchase_return",
+    "QUOTATION": "documents", "SALES_ORDER": "sales_order", "PURCHASE_ORDER": "purchase_order",
+    "PURCHASE_QUOTATION": "purchase_quotation", "CHALLAN": "challan",
 }
 GROUP_PERM = {"sales": "sales.create", "purchases": "purchases.create", "documents": "documents.manage"}
 STATUSES = ["OPEN", "CONVERTED", "CLOSED", "CANCELLED"]
@@ -43,6 +49,10 @@ def _retry(fn):
     except IntegrityError:
         with session_scope() as db:
             return fn(db)
+
+
+def _active_of(kind: str) -> str:
+    return KIND_ACTIVE.get(kind) or _group_of(kind)
 
 
 def _group_of(kind: str) -> str:
@@ -152,7 +162,7 @@ def new_bill(request: Request, kind: str = "SALE", source: str = ""):
         ws = stock_svc.load_workspace(db, actor)
         purchase_side = is_purchase_side(kind)
         return render(
-            request, "billing/new.html", actor, _group_of(kind), kind=kind, purchase_side=purchase_side, ws=ws,
+            request, "billing/new.html", actor, _active_of(kind), kind=kind, purchase_side=purchase_side, ws=ws,
             parties=_party_options(db, actor), today=_default_date(request), hist_default=selected_fy(request) < current_fy(),
             can_hist=kind in HISTORY_KINDS, fy_start_now=fy_range(current_fy())[0], business_state=actor.owner.state,
             can_pay=kind in ("SALE", "PURCHASE"), items=_item_options(ws, purchase_side), edit=None, edit_lines=[],
@@ -162,7 +172,7 @@ def new_bill(request: Request, kind: str = "SALE", source: str = ""):
 
 def bill_form(
     kind: str = Form(""), date: str = Form(""), godownId: str = Form(""), partyId: str = Form(""),
-    placeOfSupply: str = Form(""), notes: str = Form(""), gstEnabled: str = Form(""),
+    taxType: str = Form(""), notes: str = Form(""), gstEnabled: str = Form(""),
     paymentInfo: str = Form(""), schemeInfo: str = Form(""), history: str = Form(""), oldNumber: str = Form(""),
     paidNow: str = Form("0"), paymentMode: str = Form("CASH"),
     payMode: list[str] = Form(default=[]), payAmount: list[str] = Form(default=[]), payFinance: list[str] = Form(default=[]),
@@ -185,7 +195,7 @@ def bill_form(
         for i, m in enumerate(payMode) if m
     ]
     return {"kind": kind, "date": date, "partyId": partyId or None, "godownId": godownId, "gstEnabled": bool(gstEnabled),
-            "placeOfSupply": placeOfSupply, "notes": notes, "lines": lines, "paidNow": paidNow or 0, "paymentMode": paymentMode,
+            "taxType": taxType, "notes": notes, "lines": lines, "paidNow": paidNow or 0, "paymentMode": paymentMode,
             "paymentSplit": split, "paymentInfo": paymentInfo, "schemeInfo": schemeInfo, "history": bool(history),
             "oldNumber": oldNumber}
 
@@ -226,7 +236,7 @@ def edit_bill_page(voucher_id: str, request: Request):
         ws = stock_svc.load_workspace(db, actor)
         purchase_side = is_purchase_side(kind)
         return render(
-            request, "billing/new.html", actor, _group_of(kind), kind=kind, purchase_side=purchase_side, ws=ws,
+            request, "billing/new.html", actor, _active_of(kind), kind=kind, purchase_side=purchase_side, ws=ws,
             parties=_party_options(db, actor), today=v["date"], hist_default=False, can_hist=False,
             fy_start_now=fy_range(current_fy())[0], business_state=actor.owner.state,
             can_pay=kind in ("SALE", "PURCHASE"), items=_item_options(ws, purchase_side), edit=v,
@@ -268,8 +278,12 @@ def _list_page(request: Request, group: str, kind: str, status: str, frm: str, t
              "from": frm or None, "to": to or None, "q": q or None}
         rows = vouchers.list_vouchers(db, actor, f)
         creatable = [k for k in visible if actor.can(permission_for(k))]
+        single = kind if kind in visible else ""
+        if single:  # one kind asked for: title and "+ New" are that kind's
+            title = KIND_LABEL[single] + "s"
+            creatable = [single] if single in creatable else []
         total = sum((-1 if r["kind"].endswith("_RETURN") else 1) * r["total"] for r in rows if r["status"] != "CANCELLED")
-        return render(request, "billing/list.html", actor, group, group=group, title=title, rows=rows, visible=visible,
+        return render(request, "billing/list.html", actor, _active_of(single) if single else group, group=group, title=title, rows=rows, visible=visible,
                       creatable=creatable, kind=kind, status_f=status, frm=frm, to=to, q=q, statuses=STATUSES, total=total)
 
 
@@ -298,7 +312,7 @@ def detail(voucher_id: str, request: Request):
             return redirect("/app/billing/sales", flash=e.message, error=True)
         convert_to = CONVERSIONS.get(v["kind"], []) if v["status"] == "OPEN" and actor.can(permission_for(v["kind"])) else []
         return render(
-            request, "billing/detail.html", actor, _group_of(v["kind"]), v=v, group=_group_of(v["kind"]),
+            request, "billing/detail.html", actor, _active_of(v["kind"]), v=v, group=_group_of(v["kind"]),
             convert_to=convert_to, can_edit=actor.is_owner and v["status"] == "OPEN",
             can_cancel=actor.can(permission_for(v["kind"])) and v["status"] not in ("CANCELLED", "CONVERTED"),
         )

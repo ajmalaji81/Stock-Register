@@ -247,7 +247,7 @@ def _create_in_tx(
         party = db.execute(select(Party).where(Party.id == inp.partyId, Party.userId == account_id)).scalar_one_or_none()
         if party is None:
             raise StockError("Party not found", 404)
-    if kind in ("PURCHASE", "PURCHASE_RETURN", "PURCHASE_ORDER") and party is None:
+    if kind in ("PURCHASE", "PURCHASE_RETURN", "PURCHASE_ORDER", "PURCHASE_QUOTATION") and party is None:
         raise StockError("Choose the supplier for this bill")
     if kind == "SALE_RETURN" and party is None:
         raise StockError("Choose the customer returning the goods")
@@ -273,7 +273,13 @@ def _create_in_tx(
         serial_tokens = serial_svc.prepare_lines([(l, round3(l.qty)) for l in inp.lines], by_id, kind, source_id)
 
     place_of_supply = inp.placeOfSupply or (party.state if party else "") or home_state
-    inter_state = inp.gstEnabled and is_inter_state(home_state, place_of_supply)
+    tax_type = getattr(inp, "taxType", "") or ""
+    if tax_type == "IGST":  # chosen on the bill; otherwise it follows the party's state
+        inter_state = bool(inp.gstEnabled)
+    elif tax_type == "LOCAL":
+        inter_state = False
+    else:
+        inter_state = inp.gstEnabled and is_inter_state(home_state, place_of_supply)
     lines = [(l, round3(l.qty)) for l in inp.lines]
     t = calc_totals(
         [LineInput(qty=q, rate=l.rate, discount_pct=l.discountPct, tax_rate=l.taxRate) for l, q in lines],
@@ -547,7 +553,7 @@ def convert_voucher(db: Session, actor: Actor, voucher_id: str, to: str, date: O
         db, actor,
         VoucherCreateInput.model_construct(
             kind=to, date=date or today_iso(), partyId=src.partyId, godownId=src.godownId, gstEnabled=src.gstEnabled,
-            placeOfSupply=src.placeOfSupply, notes=src.notes,
+            placeOfSupply=src.placeOfSupply, taxType="IGST" if src.interState else "LOCAL", notes=src.notes,
             lines=[
                 VoucherLineInput.model_construct(
                     itemId=l.itemId, description=l.description, qty=l.qty, rate=l.rate, discountPct=l.discountPct, taxRate=l.taxRate

@@ -5,11 +5,12 @@ Run:  uvicorn app.main:app --reload --port 8000
 from __future__ import annotations
 
 import logging
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
@@ -72,6 +73,31 @@ def create_app() -> FastAPI:
     async def _unhandled(_req: Request, exc: Exception):
         log.exception("Unhandled error", exc_info=exc)
         return JSONResponse({"error": "Something went wrong"}, status_code=500)
+
+    @app.middleware("http")
+    async def pdf_export(request: Request, call_next):
+        """Any CSV download also works as a PDF: `?format=pdf`, or the same URL ending `.pdf` instead of `.csv`."""
+        path = request.url.path
+        if request.method != "GET" or not (request.query_params.get("format") == "pdf" or path.endswith(".pdf")):
+            return await call_next(request)
+        from urllib.parse import parse_qsl, urlencode
+
+        from .core.export import rows_from_csv, to_pdf
+
+        scope = request.scope
+        if path.endswith(".pdf"):
+            scope["path"] = path[:-4] + ".csv"
+            scope["raw_path"] = scope["path"].encode()
+        query = [(k, "csv" if k == "format" else v) for k, v in parse_qsl(request.url.query, keep_blank_values=True)]
+        scope["query_string"] = urlencode(query).encode()
+        res = await call_next(request)
+        if not res.headers.get("content-type", "").startswith("text/csv"):
+            return res  # a redirect or an error page: pass it on unchanged
+        raw = b"".join([chunk async for chunk in res.body_iterator]).decode("utf-8-sig", "replace")
+        m = re.search(r'filename="([^"]+)"', res.headers.get("content-disposition", ""))
+        base = re.sub(r"\.csv$", "", m.group(1)) if m else "report"
+        pdf = to_pdf(base.replace("-", " ").replace("_", " ").title(), rows_from_csv(raw))
+        return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{base}.pdf"'})
 
     app.include_router(api_router)
 

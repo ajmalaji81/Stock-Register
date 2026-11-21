@@ -36,11 +36,13 @@ class BalanceParts:
     purchase_return: float = 0
     paid_in: float = 0
     paid_out: float = 0
+    credit_note: float = 0  # we reduced what they owe us (or increased what we owe them)
+    debit_note: float = 0  # the opposite
 
 
 def party_balance(p: BalanceParts) -> float:
     """Positive = receivable (they owe us), negative = payable (we owe them)."""
-    return round2(p.opening_balance + p.sale - p.sale_return - p.purchase + p.purchase_return - p.paid_in + p.paid_out)
+    return round2(p.opening_balance + p.sale - p.sale_return - p.purchase + p.purchase_return - p.paid_in + p.paid_out - p.credit_note + p.debit_note)
 
 
 @dataclass
@@ -74,6 +76,10 @@ def ledger_sign(kind: str) -> int:
     if kind == "PAYMENT_IN":
         return -1
     if kind == "PAYMENT_OUT":
+        return 1
+    if kind == "CREDIT_NOTE":
+        return -1
+    if kind == "DEBIT_NOTE":
         return 1
     return BALANCE_SIGN[kind]
 

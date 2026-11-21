@@ -2,7 +2,7 @@
 {% block title %}Stock reports · GodownBook{% endblock %}
 {% block content %}
 <h1>Stock report</h1>
-<p><a class="btn ghost" href="/app/reports.csv">Download CSV</a></p>
+<p><a class="btn ghost" href="/app/reports.csv">Download CSV</a> <a class="btn ghost" href="/app/reports.pdf">Download PDF</a></p>
 {% if costs %}<div class="card stat"><span class="muted">Total stock value</span><b>{{ total_value|inr }}</b></div>{% endif %}
 <div class="card"><table><tr><th>Item</th>{% for g in ws.godowns %}<th class="n">{{ g.name }}</th>{% endfor %}<th class="n">Total</th>{% if costs %}<th class="n">Value</th>{% endif %}</tr>
 {% for r in rows %}<tr><td>{{ r.name }}<br><small class="muted">{{ r.sku }}</small></td>

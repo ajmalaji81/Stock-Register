@@ -13,6 +13,8 @@
   <label>Status<select name="status"><option value="">Any</option>{% for k, v in statuses.items() if k != 'VOID' %}<option value="{{ k }}" {{ 'selected' if k == status_f }}>{{ v }}</option>{% endfor %}</select></label>
   <button class="btn">Search</button>
 </form>
+{% if recent %}<div class="card"><b>Recently checked IMEIs</b>
+  <table>{% for r in recent %}<tr><td><a href="/app/serials/{{ r.imei }}"><b>{{ r.imei }}</b></a></td><td>{{ r.item }}</td><td><span class="badge {{ 'out' if r.status == 'SOLD' }}">{{ r.statusLabel }}</span></td><td>{{ r.godown }}</td></tr>{% endfor %}</table></div>{% endif %}
 <div class="card"><table>
   <tr><th>IMEI</th><th>Model</th><th>Status</th><th>Now at</th><th>Origin (purchased)</th><th>Last sold</th></tr>
   {% for r in rows %}<tr>
@@ -23,5 +25,5 @@
     <td>{% if r.origin %}{{ r.origin.party }}<br><small class="muted">{{ r.origin.date }} · {{ r.origin.number }}</small>{% else %}<span class="muted">—</span>{% endif %}</td>
     <td>{% if r.lastSale %}{{ r.lastSale.party }}<br><small class="muted">{{ r.lastSale.date }} · {{ r.lastSale.number }}</small>{% else %}<span class="muted">Not sold</span>{% endif %}</td>
   </tr>{% else %}<tr><td colspan="6" class="muted">No IMEIs found.</td></tr>{% endfor %}
-</table>{% if rows %}<p class="muted">{{ rows|length }} shown</p>{% endif %}</div>
+</table>{% if rows %}<p class="muted">Showing the latest {{ rows|length }}{% if matched > rows|length %} of {{ matched }}{{ '+' if matched >= 300 }} matches. Type more IMEI digits or add a filter to find a specific one{% endif %}.</p>{% endif %}</div>
 {% endblock %}

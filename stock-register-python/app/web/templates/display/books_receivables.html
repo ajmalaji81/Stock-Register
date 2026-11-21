@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% from "display/books_macros.html" import download %}
+{% block title %}Amount receivables · GodownBook{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">Amount receivables</h1>{{ download(csv_url) }}</div>
+<p class="muted">Party-wise balances right now, the same figures as the Parties page (opening balance, bills, returns, payments, credit and debit notes).</p>
+<div class="grid">
+ <div class="card stat">To receive<b class="in">{{ data.totalReceivable|inr }}</b></div>
+ <div class="card stat">To pay<b class="out">{{ data.totalPayable|inr }}</b></div>
+</div>
+<div class="card"><h2 style="margin:0 0 6px">To receive</h2><table><tr><th>Party</th><th>Phone</th><th class="n">Amount</th></tr>
+{% for r in data.receivable %}<tr><td><a href="/app/parties/{{ r.id }}">{{ r.name }}</a></td><td>{{ r.phone }}</td><td class="n in">{{ r.balance|inr }}</td></tr>{% else %}<tr><td colspan="3" class="muted">Nothing to receive.</td></tr>{% endfor %}
+<tr><td colspan="2"><b>Total</b></td><td class="n"><b>{{ data.totalReceivable|inr }}</b></td></tr></table></div>
+<div class="card"><h2 style="margin:0 0 6px">To pay</h2><table><tr><th>Party</th><th>Phone</th><th class="n">Amount</th></tr>
+{% for r in data.payable %}<tr><td><a href="/app/parties/{{ r.id }}">{{ r.name }}</a></td><td>{{ r.phone }}</td><td class="n out">{{ r.balance|inr }}</td></tr>{% else %}<tr><td colspan="3" class="muted">Nothing to pay.</td></tr>{% endfor %}
+<tr><td colspan="2"><b>Total</b></td><td class="n"><b>{{ data.totalPayable|inr }}</b></td></tr></table></div>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% from "display/books_macros.html" import side_tabs, download %}
+{% block title %}Ageing analysis · GodownBook{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">Ageing analysis</h1>{{ download(csv_url) }}</div>
+<p class="muted">How old the {{ 'money customers owe you' if side == 'receivable' else 'money you owe suppliers' }} is, by bill age on the “as on” date. Bills are settled oldest first (see Bill receivables / payables for the rules). The undated opening balance is counted as over 90 days. “Unadjusted advance” is money received or paid that is more than the bills.</p>
+{{ side_tabs(side, as_on, '/app/display/ageing') }}
+<div class="card"><table>
+<tr><th>Party</th>{% for k, label in data.buckets %}<th class="n">{{ label }}</th>{% endfor %}<th class="n">Total</th><th class="n">Unadjusted advance</th></tr>
+{% for r in data.rows %}<tr><td><a href="/app/parties/{{ r.id }}">{{ r.name }}</a></td>{% for k, label in data.buckets %}<td class="n">{{ r[k]|inr if r[k] else '—' }}</td>{% endfor %}<td class="n"><b>{{ r.total|inr }}</b></td><td class="n">{{ r.advance|inr if r.advance else '—' }}</td></tr>
+{% else %}<tr><td colspan="7" class="muted">Nothing outstanding.</td></tr>{% endfor %}
+<tr><td><b>Total</b></td>{% for k, label in data.buckets %}<td class="n"><b>{{ data.totals[k]|inr }}</b></td>{% endfor %}<td class="n"><b>{{ data.totals.total|inr }}</b></td><td class="n"><b>{{ data.totals.advance|inr }}</b></td></tr>
+</table></div>
+{% endblock %}

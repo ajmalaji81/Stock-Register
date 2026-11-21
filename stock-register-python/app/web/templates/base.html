@@ -24,7 +24,14 @@
     <div class="navgrp" data-group="{{ g.group }}">
       <button type="button" class="grp" aria-expanded="true" aria-controls="ng-{{ loop.index }}">{{ g.group }}<span class="chev" aria-hidden="true"></span></button>
       <div class="navitems" id="ng-{{ loop.index }}"><div class="navinner">
-      {% for n in g['items'] %}<a href="{{ n.href }}" data-nav="{{ n.key }}" class="{{ 'on' if n.key == active }}{{ ' nav-ws' if n.key == 'workspace' }}"><span>{{ n.icon }}</span> {{ n.label }}</a>{% endfor %}
+      {% for sec in g.sections %}{% if sec.sub %}
+      <div class="navgrp sub" data-group="{{ g.group }}/{{ sec.sub }}">
+        <button type="button" class="grp" aria-expanded="true" aria-controls="ng-{{ loop.index }}-{{ g.group|replace(' ', '') }}">{{ sec.sub }}<span class="chev" aria-hidden="true"></span></button>
+        <div class="navitems" id="ng-{{ loop.index }}-{{ g.group|replace(' ', '') }}"><div class="navinner">
+        {% for n in sec['items'] %}<a href="{{ n.href }}" data-nav="{{ n.key }}" class="{{ 'on' if n.key == active }}"><span>{{ n.icon }}</span> {{ n.label }}</a>{% endfor %}
+        </div></div>
+      </div>
+      {% else %}{% for n in sec['items'] %}<a href="{{ n.href }}" data-nav="{{ n.key }}" class="{{ 'on' if n.key == active }}{{ ' nav-ws' if n.key == 'workspace' }}"><span>{{ n.icon }}</span> {{ n.label }}</a>{% endfor %}{% endif %}{% endfor %}
       </div></div>
     </div>
     {% endfor %}
@@ -47,7 +54,7 @@
         <div><b>{{ actor.name }}</b><small>{{ actor.email }}</small></div></div>
     </header>
     <div class="main-body">
-    {% if flash %}<div class="flash {{ 'err' if flash.error }}">{{ flash.text }}</div>{% endif %}
+    {% if flash %}<div class="flash {{ 'err' if flash.error else 'toast' }}" {{ '' if flash.error else 'role=status' }}>{{ flash.text }}</div>{% endif %}
     {% block content %}{% endblock %}
     </div>
   </main>

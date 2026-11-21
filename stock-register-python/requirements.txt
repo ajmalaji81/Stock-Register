@@ -10,3 +10,4 @@ standardwebhooks
 dodopayments
 pytest
 httpx
+reportlab

@@ -7,9 +7,7 @@
   <input type="hidden" name="kind" value="{{ kind }}">
   <div class="card row">
     <label>Date<input type="date" name="date" value="{{ today }}" required></label>
-    {% if can_hist %}<label class="hist-box" style="flex:2;min-width:240px"><input type="checkbox" name="history" value="1" id="hist" data-before="{{ fy_start_now }}" {{ 'checked' if hist_default }}>
-      <span>Old financial-year record<br><small class="muted">Saved for reports and GST only. No stock, IMEI or customer-due change. Date must be before {{ fy_start_now }}.</small></span></label>
-    <label id="oldno" hidden>Invoice number in your old books<input name="oldNumber" maxlength="40" placeholder="e.g. INV-0045"></label>{% elif edit and edit.history %}<input type="hidden" name="history" value="1" id="hist" data-before="{{ fy_start_now }}">{% endif %}
+    {% if edit and edit.history %}<input type="hidden" name="history" value="1" id="hist" data-before="{{ fy_start_now }}">{% endif %}
     <label>Godown<select name="godownId" required>{% for g in ws.godowns %}<option value="{{ g.id }}" data-state="{{ g.state }}" {{ 'selected' if edit and edit.godownId == g.id }}>{{ g.name }}</option>{% endfor %}</select></label>
     <div class="psearch">
       <label>{{ 'Supplier' if purchase_side else 'Customer' }}
@@ -18,7 +16,10 @@
       <div id="party-list" class="plist" hidden></div>
       <small class="muted" id="party-hint"></small>
     </div>
-    <label>Place of supply<select name="placeOfSupply" id="pos"><option value="">Party's state / mine</option>{% for s in states %}<option {{ 'selected' if edit and edit.placeOfSupply == s }}>{{ s }}</option>{% endfor %}</select></label>
+    <label>Tax type<select name="taxType" id="taxtype">
+      <option value="" {{ 'selected' if not edit }}>Auto (by party's state)</option>
+      <option value="LOCAL" {{ 'selected' if edit and not edit.interState }}>Local GST (CGST + SGST)</option>
+      <option value="IGST" {{ 'selected' if edit and edit.interState }}>IGST (other state)</option></select></label>
     <label><input type="checkbox" name="gstEnabled" value="1" id="gst" {{ 'checked' if not edit or edit.gstEnabled }} style="display:inline;width:auto"> GST applies</label>
   </div>
   <div class="card">
@@ -60,7 +61,7 @@
 </form>
 <template id="line-tpl">
   <tr class="line">
-    <td><select name="itemId" class="f-item" required><option value="">Choose…</option>
+    <td><select name="itemId" class="f-item"><option value="">Choose…</option>
       {% for i in items %}<option value="{{ i.id }}" data-price="{{ i.price }}" data-gst="{{ i.gstRate }}" data-serial="{{ 1 if i.trackSerial else 0 }}">{{ i.name }} ({{ i.sku }})</option>{% endfor %}</select>
       <div class="serial-box" hidden>
         {% if kind == 'SALE' %}<textarea name="serials" class="f-serials" hidden></textarea>

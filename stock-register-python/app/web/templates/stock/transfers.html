@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Stock transfer · GodownBook{% endblock %}
+{% block content %}
+<h1>Stock transfer</h1>
+{% if ws.godowns|length > 1 %}
+<div class="card"><h2 style="margin-top:0">Transfer between godowns</h2>
+<form method="post" action="/app/stock/transfer"><input type="hidden" name="next" value="/app/stock/transfers"><div class="row">
+ <label>Item<select name="itemId" data-search required>{% for i in ws['items'] %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}</select></label>
+ <label>From<select name="fromGodownId">{% for g in ws.godowns %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></label>
+ <label>To<select name="toGodownId">{% for g in ws.godowns %}<option value="{{ g.id }}" {{ 'selected' if loop.index == 2 }}>{{ g.name }}</option>{% endfor %}</select></label>
+ <label>Qty<input name="qty" type="number" step="any" min="0" required></label>
+ <label>Remarks<input name="remarks"></label><label>Date<input name="date" type="date" value="{{ today }}"></label>
+ </div>
+ <label>IMEI numbers (for phones tracked by IMEI) — one per line, count must equal qty<textarea name="serials" rows="3" placeholder="35xxxxxxxxxxxxx"></textarea></label>
+ <button class="btn">Transfer</button></form></div>
+{% else %}<div class="card"><p class="muted">Add a second godown to transfer stock between godowns.</p></div>{% endif %}
+<div class="card"><table>
+<tr><th>Date</th><th>Item</th><th class="n">Qty</th><th>From</th><th>To</th><th>Remarks</th><th>By</th></tr>
+{% for r in rows %}<tr><td>{{ r.date }}</td><td>{{ r.itemName }}</td><td class="n">{{ r.qty|qty }} {{ r.unit }}</td><td>{{ r['from'] }}</td><td>{{ r.to }}</td><td>{{ r.remarks }}</td><td>{{ r.by }}</td></tr>
+{% else %}<tr><td colspan="7" class="muted">No transfers yet.</td></tr>{% endfor %}</table></div>
+{% if pg.total > 0 %}
+<div class="row" style="justify-content:space-between;align-items:center;margin-top:10px">
+ <span class="muted">Showing {{ pg.first }}–{{ pg.last }} of {{ pg.total }} · Page {{ pg.page }} of {{ pg.pages }}</span>
+ <span>{% if pg.page > 1 %}<a class="btn ghost" href="?page={{ pg.page - 1 }}">&larr; Previous</a>{% endif %}
+  {% if pg.page < pg.pages %}<a class="btn ghost" href="?page={{ pg.page + 1 }}">Next &rarr;</a>{% endif %}</span>
+</div>{% endif %}
+{% endblock %}

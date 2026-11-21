@@ -31,22 +31,55 @@ templates = Jinja2Templates(directory=str(BASE / "templates"))
 
 #: key, label, icon, group, any-of permissions ([] = everyone), href
 NAV: list[tuple[str, str, str, str, list[str], str]] = [
-    ("workspace", "Multi-tab workspace", "🗂", "Stock", [], "/app/workspace"),
-    ("dashboard", "Dashboard", "▦", "Stock", [], "/app"),
-    ("items", "Items", "📦", "Stock", [], "/app/items"),
-    ("ledger", "Stock ledger", "📒", "Stock", ["reports.view", "stock.move"], "/app/ledger"),
-    ("serials", "IMEI tracking", "📱", "Stock", ["reports.view", "sales.create", "purchases.create", "stock.move"], "/app/serials"),
-    ("adjustments", "Adjustments", "⚖", "Stock", ["stock.adjust"], "/app/adjustments"),
-    ("godowns", "Godowns", "🏬", "Stock", ["godowns.manage"], "/app/godowns"),
-    ("import", "Bulk import", "⇪", "Stock", ["items.manage", "parties.manage"], "/app/import"),
-    ("sales", "Sales", "🧾", "Billing", ["sales.create"], "/app/billing/sales"),
-    ("purchases", "Purchases", "🛒", "Billing", ["purchases.create"], "/app/billing/purchases"),
-    ("approvals", "Branch approvals", "✅", "Billing", ["branch.approve"], "/app/billing/approvals"),
-    ("documents", "Quotes & orders", "📄", "Billing", ["documents.manage"], "/app/billing/documents"),
-    ("parties", "Parties", "👥", "Money", ["parties.manage", "payments.manage"], "/app/parties"),
-    ("expenses", "Expenses", "💸", "Money", ["expenses.manage"], "/app/expenses"),
-    ("reports", "Stock reports", "📊", "Reports", ["reports.view"], "/app/reports"),
-    ("billreports", "Sales & GST", "₹", "Reports", ["reports.view"], "/app/billing/reports"),
+    # (key, label, icon, "Group" or "Group/Sub group", any-of permissions ([] = everyone), href). The key marks the row as active on its pages.
+    # ---- Home
+    ("workspace", "Multi-tab workspace", "🗂", "Home", [], "/app/workspace"),
+    ("dashboard", "Dashboard", "▦", "Home", [], "/app"),
+    # ---- Masters
+    ("items", "Items", "📦", "Masters/Inventory", [], "/app/items"),
+    ("item_groups", "Item groups", "🗂", "Masters/Inventory", ["items.manage", "reports.view"], "/app/masters/item-groups"),
+    ("godowns", "Godowns", "🏬", "Masters/Inventory", ["godowns.manage"], "/app/godowns"),
+    ("parties", "Parties", "👥", "Masters/Parties", ["parties.manage", "payments.manage"], "/app/parties"),
+    ("import", "Bulk import", "⇪", "Masters/Master tools", ["items.manage", "parties.manage"], "/app/import"),
+    # ---- Vouchers
+    ("purchases", "Purchase", "🛒", "Vouchers/Item vouchers", ["purchases.create"], "/app/billing/purchases?kind=PURCHASE"),
+    ("purchase_return", "Purchase return", "↩", "Vouchers/Item vouchers", ["purchases.create"], "/app/billing/purchases?kind=PURCHASE_RETURN"),
+    ("sales", "Sales", "🧾", "Vouchers/Item vouchers", ["sales.create"], "/app/billing/sales?kind=SALE"),
+    ("sale_return", "Sales return", "↪", "Vouchers/Item vouchers", ["sales.create"], "/app/billing/sales?kind=SALE_RETURN"),
+    ("material_in", "Material in", "⬇", "Vouchers/Item vouchers", ["stock.move"], "/app/stock/material-in"),
+    ("material_out", "Material out", "⬆", "Vouchers/Item vouchers", ["stock.move"], "/app/stock/material-out"),
+    ("adjustments", "Stock journal", "⚖", "Vouchers/Item vouchers", ["stock.adjust"], "/app/adjustments"),
+    ("stock_transfer", "Stock transfer", "⇄", "Vouchers/Item vouchers", ["stock.transfer"], "/app/stock/transfers"),
+    ("purchase_quotation", "Purchase quotation", "📝", "Vouchers/Item vouchers", ["documents.manage"], "/app/billing/documents?kind=PURCHASE_QUOTATION"),
+    ("documents", "Sales quotation", "📄", "Vouchers/Item vouchers", ["documents.manage"], "/app/billing/documents?kind=QUOTATION"),
+    ("purchase_order", "Purchase order", "📑", "Vouchers/Item vouchers", ["documents.manage"], "/app/billing/documents?kind=PURCHASE_ORDER"),
+    ("sales_order", "Sales order", "📋", "Vouchers/Item vouchers", ["documents.manage"], "/app/billing/documents?kind=SALES_ORDER"),
+    ("challan", "Delivery challan", "🚚", "Vouchers/Item vouchers", ["documents.manage"], "/app/billing/documents?kind=CHALLAN"),
+    ("receipts", "Receipt", "💰", "Vouchers/Account vouchers", ["payments.manage"], "/app/accounts/receipts"),
+    ("payments", "Payment", "💳", "Vouchers/Account vouchers", ["payments.manage"], "/app/accounts/payments"),
+    ("credit_note", "Credit note", "➕", "Vouchers/Account vouchers", ["payments.manage"], "/app/accounts/vouchers?kind=CREDIT_NOTE"),
+    ("debit_note", "Debit note", "➖", "Vouchers/Account vouchers", ["payments.manage"], "/app/accounts/vouchers?kind=DEBIT_NOTE"),
+    ("journal", "Journal", "📓", "Vouchers/Account vouchers", ["payments.manage"], "/app/accounts/vouchers?kind=JOURNAL"),
+    ("expenses", "Expenses", "💸", "Vouchers/Account vouchers", ["expenses.manage"], "/app/expenses"),
+    ("approvals", "Branch approvals", "✅", "Vouchers/Approval management", ["branch.approve"], "/app/billing/approvals"),
+    # ---- Display
+    ("day_book", "Day book", "📅", "Display/Books & registers", ["reports.view"], "/app/display/day-book"),
+    ("book_ledger", "Ledger", "📒", "Display/Books & registers", ["reports.view"], "/app/display/ledger"),
+    ("transaction_summary", "Transaction summary", "Σ", "Display/Summaries", ["reports.view"], "/app/display/transaction-summary"),
+    ("monthly_summary", "Monthly summary", "🗓", "Display/Summaries", ["reports.view"], "/app/display/monthly-summary"),
+    ("receivables", "Amount receivables", "📥", "Display/Outstanding & ageing", ["reports.view", "parties.manage"], "/app/display/receivables"),
+    ("ageing", "Ageing analysis", "⏳", "Display/Outstanding & ageing", ["reports.view", "parties.manage"], "/app/display/ageing"),
+    ("bill_outstanding", "Bill receivables / payables", "🧮", "Display/Outstanding & ageing", ["reports.view", "parties.manage"], "/app/display/bill-outstanding"),
+    ("stock_status", "Stock status", "📶", "Display/Stock analysis", ["reports.view", "stock.move"], "/app/display/stock-status"),
+    ("ledger", "Stock ledger", "📒", "Display/Stock analysis", ["reports.view", "stock.move"], "/app/ledger"),
+    ("inventory_summary", "Inventory summary", "🧺", "Display/Stock analysis", ["reports.view", "stock.move"], "/app/display/inventory-summary"),
+    ("reports", "Stock reports", "📊", "Display/Stock analysis", ["reports.view"], "/app/reports"),
+    ("sales_analysis", "Sales analysis", "📈", "Display/Sales & purchase analysis", ["reports.view"], "/app/display/sales-analysis"),
+    ("purchase_analysis", "Purchase analysis", "📉", "Display/Sales & purchase analysis", ["reports.view"], "/app/display/purchase-analysis"),
+    ("billreports", "Sales & GST", "₹", "Display/Sales & purchase analysis", ["reports.view"], "/app/billing/reports"),
+    ("serial_stock", "IMEI wise stock", "📱", "Display/Serial number reports", ["reports.view", "sales.create", "purchases.create", "stock.move"], "/app/display/serial-stock"),
+    ("serials", "Serial no. history", "🔎", "Display/Serial number reports", ["reports.view", "sales.create", "purchases.create", "stock.move"], "/app/serials"),
+    # ---- Business
     ("staff", "Staff", "🧑‍💼", "Business", ["staff.manage"], "/app/staff"),
     ("activity", "Activity", "🕒", "Business", ["activity.view"], "/app/activity"),
     ("settings", "Settings", "⚙", "Business", ["settings.manage"], "/app/settings"),
@@ -122,8 +155,17 @@ def nav_for(actor: Actor) -> list[dict]:
     out: dict[str, list[dict]] = {}
     for key, label, icon, group, perms, href in NAV:
         if not perms or any(actor.can(p) for p in perms):
-            out.setdefault(group, []).append({"key": key, "label": label, "icon": icon, "href": href})
-    return [{"group": g, "items": items} for g, items in out.items()]
+            top, _, sub = group.partition("/")  # "Accounts/Account vouchers": a sub group inside the Accounts group
+            out.setdefault(top, []).append({"key": key, "label": label, "icon": icon, "href": href, "sub": sub})
+    result = []
+    for g, items in out.items():
+        sections: list[dict] = []
+        for it in items:
+            if not sections or sections[-1]["sub"] != it["sub"] or not it["sub"]:
+                sections.append({"sub": it["sub"], "items": []})
+            sections[-1]["items"].append(it)
+        result.append({"group": g, "items": items, "sections": sections})
+    return result
 
 
 FY_COOKIE = "sr_fy"

@@ -35,7 +35,7 @@ def test_asset_urls_carry_a_version(client):
 def test_sidebar_groups_can_be_hidden_and_shown(client):
     signup(client)
     page = client.get("/app").text
-    for group in ("Stock", "Billing", "Money", "Reports", "Business"):
+    for group in ("Home", "Masters", "Vouchers", "Display", "Business"):
         assert f'data-group="{group}"' in page
     assert page.count('class="grp" aria-expanded="true"') >= 4 and "/static/nav.js?v=" in page
     js = client.get("/static/nav.js").text

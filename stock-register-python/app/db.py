@@ -67,6 +67,7 @@ _NEW_COLUMNS = [
     ("Voucher", "branchAt", "INTEGER"),
     ("Voucher", "linkedVoucherId", "TEXT"),
     ("Voucher", "history", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("Account", "isGroup", "BOOLEAN NOT NULL DEFAULT 0"),
 ]
 
 
@@ -74,7 +75,7 @@ def _add_missing_columns(engine: Engine) -> None:
     from sqlalchemy import inspect, text
 
     insp = inspect(engine)
-    added_with_bill = False
+    added_with_bill = added_group = False
     with engine.begin() as conn:
         for table, col, ddl in _NEW_COLUMNS:
             if not insp.has_table(table):
@@ -85,6 +86,10 @@ def _add_missing_columns(engine: Engine) -> None:
                 ddl = ddl.replace("DEFAULT 0", "DEFAULT FALSE")
             conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{col}" {ddl}'))
             added_with_bill = added_with_bill or col == "withBill"
+            added_group = added_group or col == "isGroup"
+        if added_group:  # the five top-level accounts created earlier are groups; the sub accounts under them stay ledgers
+            flag = "TRUE" if engine.dialect.name == "postgresql" else "1"
+            conn.execute(text(f'UPDATE "Account" SET "isGroup" = {flag} WHERE "depth" = 1'))
         if added_with_bill:  # payments recorded together with a bill before this column existed
             flag = "TRUE" if engine.dialect.name == "postgresql" else "1"
             conn.execute(text(

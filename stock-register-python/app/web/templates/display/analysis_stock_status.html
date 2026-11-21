@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Stock status · GodownBook{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">Stock status</h1>
+ <a class="btn ghost" href="{{ request.url.include_query_params(format='csv') }}">⬇ Download Excel</a>
+ <a class="btn ghost" href="{{ request.url.include_query_params(format='pdf') }}">⬇ Download PDF</a></div>
+<p class="muted">Stock on hand right now, by item group. Low = at or below the item's minimum stock alert.</p>
+<form method="get" class="card row">
+ <label>Godown<select name="godown" onchange="this.form.submit()"><option value="">All godowns</option>{% for g in d.godowns %}<option value="{{ g.id }}" {{ 'selected' if d.godown == g.id }}>{{ g.name }}</option>{% endfor %}</select></label>
+ <label>Search<input name="q" value="{{ d.q }}" placeholder="Name, SKU, group"></label>
+ <label style="display:flex;gap:8px;align-items:center;flex:0"><input type="checkbox" name="low" value="1" style="width:auto" {{ 'checked' if d.lowOnly }} onchange="this.form.submit()"> Low / out only</label>
+ <button class="btn">Show</button>
+</form>
+<div class="grid">
+ <div class="card stat"><span class="muted">Items</span><b>{{ d['items'] }}</b></div>
+ <div class="card stat"><span class="muted">Out of stock</span><b class="out">{{ d.out }}</b></div>
+ <div class="card stat"><span class="muted">Low stock</span><b class="low">{{ d.low }}</b></div>
+ {% if d.costs %}<div class="card stat"><span class="muted">Stock value</span><b>{{ d.value|inr }}</b></div>{% endif %}
+</div>
+<div class="card"><table>
+<tr><th>Item</th><th class="n">Stock</th><th class="n">Min alert</th><th>Status</th>{% if d.costs %}<th class="n">Value</th>{% endif %}</tr>
+{% for g in d.groups %}
+<tr><td colspan="{{ 5 if d.costs else 4 }}" style="background:var(--soft)"><b>{{ g.name }}</b> <small class="muted">· {{ g.rows|length }} item{{ 's' if g.rows|length != 1 }}{% if d.costs %} · {{ g.value|inr }}{% endif %}</small></td></tr>
+{% for r in g.rows %}<tr>
+ <td style="padding-left:22px">{{ r.name }}{% if r.trackSerial %} <span class="badge">IMEI</span>{% endif %}<br><small class="muted">{{ r.sku }}</small></td>
+ <td class="n">{{ r.qty|qty }} {{ r.unit }}</td><td class="n">{{ r.min|qty if r.min else '—' }}</td>
+ <td>{% if r.status == 'OUT' %}<span class="badge out">Out of stock</span>{% elif r.status == 'LOW' %}<span class="badge low">Low</span>{% else %}<span class="badge">OK</span>{% endif %}</td>
+ {% if d.costs %}<td class="n">{{ r.value|inr }}</td>{% endif %}</tr>{% endfor %}
+{% else %}<tr><td colspan="5" class="muted">No items found.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% from "display/books_macros.html" import download %}
+{% block title %}Ledger · GodownBook{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">Ledger</h1>{% if data %}{{ download(csv_url) }}{% endif %}</div>
+<p class="muted">Pick a party or an account to see its running balance. Dr means the party owes you (or the account is in debit).</p>
+{% if err %}<div class="flash err">{{ err }}</div>{% endif %}
+<form class="card row" method="get">
+ <label style="flex:2">Ledger
+  <select name="pick" id="pick" data-search>
+   <option value="">Choose a party or account…</option>
+   <optgroup label="Parties">{% for p in choices.parties %}<option value="party:{{ p.id }}" {{ 'selected' if kind == 'party' and ledger_id == p.id }}>{{ p.name }}</option>{% endfor %}</optgroup>
+   <optgroup label="Accounts">{% for a in choices.accounts %}<option value="account:{{ a.id }}" {{ 'selected' if kind == 'account' and ledger_id == a.id }}>{{ a.name }}</option>{% endfor %}</optgroup>
+  </select></label>
+ <input type="hidden" name="kind" id="kind" value="{{ kind }}"><input type="hidden" name="id" id="lid" value="{{ ledger_id }}">
+ <label>From<input type="date" name="frm" value="{{ frm }}"></label><label>To<input type="date" name="to" value="{{ to }}"></label>
+ <button class="btn">Show</button>
+</form>
+<script>(function(){var f=document.getElementById("pick").form;
+f.addEventListener("submit",function(){var v=document.getElementById("pick").value.split(":");document.getElementById("kind").value=v[0]||"";document.getElementById("lid").value=v[1]||"";document.getElementById("pick").disabled=true;});})();</script>
+{% if data %}
+<div class="card"><h2 style="margin:0 0 6px">{{ data.name }}</h2>
+<table><tr><th>Date</th><th>Particulars</th><th class="n">Debit</th><th class="n">Credit</th><th class="n">Balance</th></tr>
+{% for r in data.rows %}<tr><td>{{ r.date }}</td><td>{% if r.href %}<a href="{{ r.href }}">{{ r.ref }}</a>{% else %}{{ r.ref }}{% endif %}</td><td class="n">{{ r.debit|inr if r.debit }}</td><td class="n">{{ r.credit|inr if r.credit }}</td><td class="n">{{ r.balance|abs|inr }} {{ r.side }}</td></tr>
+{% else %}<tr><td colspan="5" class="muted">No entries in this period.</td></tr>{% endfor %}
+</table><p>Closing balance: <b>{{ data.closing|abs|inr }} {{ data.closingSide }}</b></p></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}New {{ label|lower }} · GodownBook{% endblock %}
+{% block content %}
+<h1>New {{ label|lower }}</h1>
+<form class="card" method="post" action="/app/accounts/notes" id="note">
+ <input type="hidden" name="kind" value="{{ kind }}">
+ <div class="row">
+  <label>Date<input type="date" name="date" value="{{ today }}" required></label>
+  <label>{{ 'Customer / supplier' }}
+   <select name="partyId" data-search required><option value="">Choose a party…</option>{% for p in parties %}<option value="{{ p.id }}">{{ p.name }}{% if p.phone %} · {{ p.phone }}{% endif %}</option>{% endfor %}</select></label>
+  <label>{{ 'Amount' }}<input name="amount" type="number" step="0.01" min="0.01" required autofocus></label>
+ </div>
+ <div class="row">
+  <label>Account (other side){% if kind == 'CREDIT_NOTE' %} — debited{% else %} — credited{% endif %}
+   <select name="accountId" data-search required><option value="">Choose account…</option>{% for a in flat %}<option value="{{ a.id }}">{{ a.path }}</option>{% endfor %}</select></label>
+  <label style="flex:2">Reason / narration<input name="narration" maxlength="300" placeholder="e.g. Rate difference, damaged goods, discount allowed"></label>
+ </div>
+ <button class="btn" id="nsave">Save {{ label|lower }}</button>
+ <p class="muted" style="margin:8px 0 0">
+ {% if kind == 'CREDIT_NOTE' %}A credit note <b>reduces what the customer owes you</b> (or increases what you owe a supplier).
+ {% else %}A debit note <b>increases what the customer owes you</b> (or reduces what you owe a supplier).{% endif %}
+ It only changes the party's balance and the account. It does not move stock and carries no GST; use Sales / Purchase Return for returned goods.</p>
+</form>
+<script>(function(){var f=document.getElementById("note");var ok=false;
+f.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.tagName==="INPUT"&&!e.defaultPrevented){e.preventDefault();var l=[].slice.call(f.querySelectorAll("input,select")).filter(function(x){return x.type!=="hidden"&&x.offsetParent!==null});var i=l.indexOf(e.target);if(l[i+1])l[i+1].focus()}});
+f.addEventListener("submit",function(e){if(ok)return;e.preventDefault();
+ var p=f.partyId.options[f.partyId.selectedIndex];
+ if(confirm("Save this {{ label|lower }} of ₹"+f.amount.value+(p&&p.value?" for "+p.text:"")+"?")){ok=true;f.submit()}});})();</script>
+{% endblock %}

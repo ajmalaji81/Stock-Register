@@ -121,11 +121,11 @@ def test_year_switch_filters_lists_and_reports(client):
     detail = client.get("/app/billing/" + client.get("/api/vouchers?q=OLD-45").json()[0]["id"]).text
     assert "Old year" in detail and "did not change stock" in detail
 
-    form = client.get("/app/billing/new?kind=SALE").text  # an old year opens the form as an old-year record
-    assert f'value="{OLD_FY + 1}-03-31"' in form and 'id="hist"' in form and "checked" in form.split('id="hist"')[1][:120]
+    form = client.get("/app/billing/new?kind=SALE").text  # the form no longer offers an "old financial-year record" option
+    assert f'value="{OLD_FY + 1}-03-31"' in form and "Old financial-year record" not in form
     client.post("/app/fy", data={"fy": str(CUR), "next": "/app"})
     cur_form = client.get("/app/billing/new?kind=SALE").text
-    assert date.today().isoformat() in cur_form and "checked" not in cur_form.split('id="hist"')[1][:120]
+    assert date.today().isoformat() in cur_form and "Old financial-year record" not in cur_form
 
 
 def test_fy_redirect_is_safe_and_junk_year_falls_back(client):

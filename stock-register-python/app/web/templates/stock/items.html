@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Items · GodownBook{% endblock %}
 {% block content %}
-<h1>Items</h1>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">Items</h1>
+{% if can(actor,'items.manage') %}<button type="button" class="btn" id="new-item-btn">+ New item</button>{% endif %}</div>
 {% include "stock/_scope.html" %}
 <div class="card"><table>
 <tr><th>Item</th><th>Category</th><th class="n">Qty</th>{% if costs %}<th class="n">Cost</th>{% endif %}<th class="n">Sale</th><th class="n">GST %</th><th></th></tr>
@@ -15,44 +16,29 @@
 </table></div>
 
 {% if can(actor,'items.manage') %}
-<div class="card" id="form"><h2>{{ 'Edit item' if editing else 'New item' }}</h2>
+<div class="modal" id="item-modal" {{ '' if editing else 'hidden' }}><div class="modal-card" id="form" style="width:min(720px,100%);overflow:auto"><h2 style="margin:0">{{ 'Edit item' if editing else 'New item' }}</h2>
 <form method="post" action="/app/items/save">
  <input type="hidden" name="id" value="{{ editing.id if editing }}">
  <div class="row"><label>Name<input name="name" required value="{{ editing.name if editing }}"></label>
  <label>SKU / barcode<input name="sku" required value="{{ editing.sku if editing }}"></label>
- <label>Category<input name="category" value="{{ editing.category if editing }}"></label>
+ <label>Category / group<input name="category" list="item-groups" value="{{ editing.category if editing }}"><datalist id="item-groups">{% for g in groups %}<option value="{{ g }}">{% endfor %}</datalist></label>
  <label>Unit<input name="unit" value="{{ editing.unit if editing else 'pcs' }}"></label></div>
  <div class="row">{% if costs %}<label>Purchase price<input name="purchasePrice" type="number" step="any" min="0" value="{{ editing.purchasePrice if editing else 0 }}"></label>{% endif %}
  <label>Sale price<input name="salePrice" type="number" step="any" min="0" value="{{ editing.salePrice if editing else 0 }}"></label>
  <label>Min stock alert<input name="minStockAlert" type="number" step="any" min="0" value="{{ editing.minStockAlert if editing else 0 }}"></label>
  <label>HSN<input name="hsn" value="{{ editing.hsn if editing }}"></label>
- <label>GST %<input name="gstRate" type="number" step="any" min="0" max="100" value="{{ editing.gstRate if editing else 0 }}"></label></div>
+ <label>GST %<select name="gstRate">{% set cur = (editing.gstRate if editing else 0)|float %}
+  {% for v, t in [(0,'0% – Nil / exempt (fresh food, books)'),(0.25,'0.25% – Rough diamonds'),(3,'3% – Gold, silver, jewellery'),(5,'5% – Essentials, daily-use goods'),(18,'18% – Most goods &amp; services (mobiles, electronics)'),(40,'40% – Luxury / sin goods')] %}<option value="{{ v }}" {{ 'selected' if cur == v }}>{{ t|safe }}</option>{% endfor %}
+  {% if cur not in [0,0.25,3,5,18,40] %}<option value="{{ cur|qty }}" selected>{{ cur|qty }}% – old rate (current value)</option>{% endif %}</select></label></div>
  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="trackSerial" value="1" style="width:auto" {{ 'checked' if editing and editing.trackSerial }}> Track every unit by IMEI / serial number (phones)</label>
  {% if not editing %}<div class="row"><label>Opening qty<input name="openingQty" type="number" step="any" min="0"></label>
  <label>Opening godown<select name="openingGodownId">{% for g in ws.godowns %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></label></div>{% endif %}
- <button class="btn">Save item</button>{% if editing %} <a class="btn ghost" href="/app/items">Cancel</a>{% endif %}
-</form></div>{% endif %}
-
-{% if can(actor,'stock.move') %}
-<div class="card"><h2>Stock IN / OUT</h2>
-<form method="post" action="/app/stock/move"><div class="row">
- <label>Item<select name="itemId">{% for i in ws['items'] %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}</select></label>
- <label>Godown<select name="godownId">{% for g in ws.godowns %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></label>
- <label>Type<select name="type"><option>IN</option><option>OUT</option></select></label>
- <label>Qty<input name="qty" type="number" step="any" min="0" required></label>
- <label>Rate<input name="rate" type="number" step="any" min="0" value="0"></label>
- <label>Party<input name="party"></label><label>Remarks<input name="remarks"></label>
- <label>Date<input name="date" type="date" value="{{ today }}"></label><button class="btn">Record</button></div></form></div>{% endif %}
-
-{% if can(actor,'stock.transfer') and ws.godowns|length > 1 %}
-<div class="card"><h2>Transfer between godowns</h2>
-<form method="post" action="/app/stock/transfer"><div class="row">
- <label>Item<select name="itemId">{% for i in ws['items'] %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}</select></label>
- <label>From<select name="fromGodownId">{% for g in ws.godowns %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></label>
- <label>To<select name="toGodownId">{% for g in ws.godowns %}<option value="{{ g.id }}" {{ 'selected' if loop.index == 2 }}>{{ g.name }}</option>{% endfor %}</select></label>
- <label>Qty<input name="qty" type="number" step="any" min="0" required></label>
- <label>Remarks<input name="remarks"></label><label>Date<input name="date" type="date" value="{{ today }}"></label>
- </div>
- <label>IMEI numbers (for phones tracked by IMEI) — one per line, count must equal qty<textarea name="serials" rows="3" placeholder="35xxxxxxxxxxxxx"></textarea></label>
- <button class="btn">Transfer</button></form></div>{% endif %}
+ <button class="btn">Save item</button>{% if editing %}{% endif %}<button type="button" class="btn ghost" data-close-item>Cancel</button>
+</form></div></div>
+<script>(function(){var m=document.getElementById("item-modal"),b=document.getElementById("new-item-btn");if(!m)return;
+function close(){if(location.search.indexOf("edit=")>-1){location.href="/app/items"}else{m.hidden=true}}
+if(b)b.addEventListener("click",function(){m.hidden=false;var f=m.querySelector("input[name=name]");if(f)f.focus()});
+m.querySelector("[data-close-item]").addEventListener("click",close);
+m.addEventListener("mousedown",function(e){if(e.target===m)close()});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!m.hidden)close()});})();</script>{% endif %}
 {% endblock %}

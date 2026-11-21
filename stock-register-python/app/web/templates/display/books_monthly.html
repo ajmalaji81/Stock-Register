@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% from "display/books_macros.html" import period_form, download %}
+{% block title %}Monthly summary · GodownBook{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">Monthly summary</h1>{{ download(csv_url) }}</div>
+<p class="muted">One row per month. Net = (sales − sales return) − (purchase − purchase return) − expenses.</p>
+{{ period_form(frm, to) }}
+<div class="card"><table>
+<tr><th>Month</th><th class="n">Sales</th><th class="n">Sales return</th><th class="n">Purchase</th><th class="n">Purchase return</th><th class="n">Receipts</th><th class="n">Payments</th><th class="n">Expenses</th><th class="n">Net</th></tr>
+{% for r in data.rows %}<tr><td>{{ r.label }}</td><td class="n">{{ r.sale|inr }}</td><td class="n">{{ r.sale_return|inr }}</td><td class="n">{{ r.purchase|inr }}</td><td class="n">{{ r.purchase_return|inr }}</td><td class="n">{{ r.receipt|inr }}</td><td class="n">{{ r.payment|inr }}</td><td class="n">{{ r.expense|inr }}</td><td class="n"><b>{{ r.net|inr }}</b></td></tr>{% endfor %}
+{% set t = data.total %}<tr><td><b>Total</b></td><td class="n"><b>{{ t.sale|inr }}</b></td><td class="n"><b>{{ t.sale_return|inr }}</b></td><td class="n"><b>{{ t.purchase|inr }}</b></td><td class="n"><b>{{ t.purchase_return|inr }}</b></td><td class="n"><b>{{ t.receipt|inr }}</b></td><td class="n"><b>{{ t.payment|inr }}</b></td><td class="n"><b>{{ t.expense|inr }}</b></td><td class="n"><b>{{ t.net|inr }}</b></td></tr>
+</table></div>
+{% endblock %}

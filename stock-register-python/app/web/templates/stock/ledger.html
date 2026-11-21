@@ -9,7 +9,8 @@
  <label>Type<select name="type"><option value="">All</option>{% for t in types %}<option {{ 'selected' if f.type == t }}>{{ t }}</option>{% endfor %}</select></label>
  <label>From<input type="date" name="from" value="{{ f['from'] }}"></label><label>To<input type="date" name="to" value="{{ f.to }}"></label>
  <button class="btn">Filter</button>
- <a class="btn ghost" href="/app/ledger.csv?itemId={{ f.itemId }}&godownId={{ f.godownId }}&type={{ f.type }}&from={{ f['from'] }}&to={{ f.to }}">CSV</a>
+ <a class="btn ghost" href="/app/ledger.csv?itemId={{ f.itemId }}&godownId={{ f.godownId }}&type={{ f.type }}&from={{ f['from'] }}&to={{ f.to }}">Download Excel</a>
+ <a class="btn ghost" href="/app/ledger.pdf?itemId={{ f.itemId }}&godownId={{ f.godownId }}&type={{ f.type }}&from={{ f['from'] }}&to={{ f.to }}">Download PDF</a>
 </form>
 <div class="card"><table>
 <tr><th>Date</th><th>Item</th><th>Godown</th><th>Type</th><th class="n">In</th><th class="n">Out</th><th class="n">Balance</th>{% if costs %}<th class="n">Rate</th>{% endif %}<th>Party / remarks</th><th>By</th></tr>
@@ -17,4 +18,14 @@
 <td class="n in">{{ e.qtyIn|qty if e.qtyIn }}</td><td class="n out">{{ e.qtyOut|qty if e.qtyOut }}</td><td class="n">{{ e.balance|qty }}</td>
 {% if costs %}<td class="n">{{ e.rate|inr }}</td>{% endif %}<td>{{ e.party }}{% if e.remarks %}<br><small class="muted">{{ e.remarks }}</small>{% endif %}</td><td>{{ e.actorName }}</td></tr>
 {% else %}<tr><td colspan="10" class="muted">No entries.</td></tr>{% endfor %}</table></div>
+{% if total > 0 %}
+{% set qs = '&itemId=' ~ f.itemId|urlencode ~ '&godownId=' ~ f.godownId|urlencode ~ '&type=' ~ f.type|urlencode ~ '&from=' ~ f['from']|urlencode ~ '&to=' ~ f.to|urlencode %}
+<div class="row" style="justify-content:space-between;align-items:center;margin-top:10px">
+ <span class="muted">Showing {{ first }}–{{ last }} of {{ total }} · Page {{ page }} of {{ pages }}</span>
+ <span>
+  {% if page > 1 %}<a class="btn ghost" href="?page={{ page - 1 }}{{ qs }}">&larr; Previous</a>{% endif %}
+  {% if page < pages %}<a class="btn ghost" href="?page={{ page + 1 }}{{ qs }}">Next &rarr;</a>{% endif %}
+ </span>
+</div>
+{% endif %}
 {% endblock %}

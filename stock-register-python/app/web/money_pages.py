@@ -30,6 +30,11 @@ ACTION_LABELS = {
     "party.create": "Party added", "party.update": "Party edited", "party.delete": "Party deleted", "party.import": "Parties imported",
     "payment.create": "Payment recorded", "payment.reverse": "Payment reversed",
     "expense.create": "Expense added", "expense.delete": "Expense deleted",
+    "account.create": "Account added", "account.update": "Account renamed", "account.delete": "Account deleted",
+    "journal.create": "Journal entry", "journal.cancel": "Journal cancelled",
+    "credit_note.create": "Credit note", "credit_note.cancel": "Credit note cancelled",
+    "debit_note.create": "Debit note", "debit_note.cancel": "Debit note cancelled",
+    "itemgroup.create": "Item group added", "itemgroup.update": "Item group renamed", "itemgroup.delete": "Item group deleted",
     "settings.update": "Settings changed", "profile.update": "Profile picture changed",
 }
 

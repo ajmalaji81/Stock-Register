@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ label }} · GodownBook{% endblock %}
+{% block content %}
+<h1>{{ label }}</h1>
+{% if err %}<div class="flash err">{{ err }}</div>{% endif %}
+<div class="card"><h2 style="margin-top:0">Record {{ label|lower }}</h2>
+<form method="post" action="/app/stock/move"><input type="hidden" name="type" value="{{ kind }}"><input type="hidden" name="next" value="{{ base }}"><div class="row">
+ <label>Item<select name="itemId" data-search required>{% for i in ws['items'] %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}</select></label>
+ <label>Godown<select name="godownId">{% for g in ws.godowns %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></label>
+ <label>Qty<input name="qty" type="number" step="any" min="0" required></label>
+ <label>Rate<input name="rate" type="number" step="any" min="0" value="0"></label>
+ <label>{{ 'Received from' if kind == 'IN' else 'Issued to' }}<input name="party"></label>
+ <label>Remarks<input name="remarks"></label>
+ <label>Date<input name="date" type="date" value="{{ today }}"></label><button class="btn">Record</button></div></form></div>
+<form method="get" class="card row">
+ <label>Item<select name="itemId" data-search><option value="">All</option>{% for i in ws['items'] %}<option value="{{ i.id }}" {{ 'selected' if f.itemId == i.id }}>{{ i.name }}</option>{% endfor %}</select></label>
+ <label>Godown<select name="godownId"><option value="">All</option>{% for g in ws.godowns %}<option value="{{ g.id }}" {{ 'selected' if f.godownId == g.id }}>{{ g.name }}</option>{% endfor %}</select></label>
+ <label>From<input type="date" name="from" value="{{ f['from'] }}"></label><label>To<input type="date" name="to" value="{{ f.to }}"></label>
+ <button class="btn">Filter</button>
+</form>
+<div class="card"><table>
+<tr><th>Date</th><th>Item</th><th>Godown</th><th class="n">Qty</th>{% if costs %}<th class="n">Rate</th>{% endif %}<th>{{ 'Received from' if kind == 'IN' else 'Issued to' }} / remarks</th><th>By</th></tr>
+{% for e in rows %}<tr><td>{{ e.date }}</td><td>{{ e.itemName }}</td><td>{{ e.godownName }}</td>
+<td class="n {{ 'in' if kind == 'IN' else 'out' }}">{{ (e.qtyIn if kind == 'IN' else e.qtyOut)|qty }} {{ e.unit }}</td>{% if costs %}<td class="n">{{ e.rate|inr }}</td>{% endif %}
+<td>{{ e.party }}{% if e.remarks %}<br><small class="muted">{{ e.remarks }}</small>{% endif %}</td><td>{{ e.actorName }}</td></tr>
+{% else %}<tr><td colspan="7" class="muted">No {{ label|lower }} entries.</td></tr>{% endfor %}</table></div>
+{% if pg.total > 0 %}
+{% set qs = '&itemId=' ~ f.itemId|urlencode ~ '&godownId=' ~ f.godownId|urlencode ~ '&from=' ~ f['from']|urlencode ~ '&to=' ~ f.to|urlencode %}
+<div class="row" style="justify-content:space-between;align-items:center;margin-top:10px">
+ <span class="muted">Showing {{ pg.first }}–{{ pg.last }} of {{ pg.total }} · Page {{ pg.page }} of {{ pg.pages }}</span>
+ <span>{% if pg.page > 1 %}<a class="btn ghost" href="?page={{ pg.page - 1 }}{{ qs }}">&larr; Previous</a>{% endif %}
+  {% if pg.page < pg.pages %}<a class="btn ghost" href="?page={{ pg.page + 1 }}{{ qs }}">Next &rarr;</a>{% endif %}</span>
+</div>{% endif %}
+{% endblock %}

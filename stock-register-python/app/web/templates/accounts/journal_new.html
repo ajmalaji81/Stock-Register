@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}New journal entry · GodownBook{% endblock %}
+{% block content %}
+<h1>New journal entry</h1>
+<form method="post" action="/app/accounts/journal" id="jv">
+ <div class="card row">
+  <label>Date<input type="date" name="date" value="{{ today }}" required></label>
+  <label style="flex:3">Narration<input name="narration" maxlength="300" placeholder="What is this entry for?"></label>
+ </div>
+ <div class="card">
+  <table id="jl">
+   <tr><th style="width:42%">Account</th><th class="n">Debit</th><th class="n">Credit</th><th>Line note</th><th></th></tr>
+  </table>
+  <button type="button" class="btn ghost sm" id="jadd">+ Add line</button>
+ </div>
+ <div class="card row" style="align-items:center">
+  <div class="stat"><span class="muted">Debit</span> <b id="jd">₹0</b> <span class="muted">Credit</span> <b id="jc">₹0</b> <span id="jdiff" class="muted"></span></div>
+  <button class="btn" id="jsave">Save journal</button>
+ </div>
+</form>
+<template id="jtpl"><tr class="jl-row">
+ <td><select name="accountId" data-search><option value="">Choose account…</option>{% for a in flat %}<option value="{{ a.id }}">{{ a.path }}</option>{% endfor %}</select></td>
+ <td><input name="debit" type="number" step="0.01" min="0" class="n j-dr"></td>
+ <td><input name="credit" type="number" step="0.01" min="0" class="n j-cr"></td>
+ <td><input name="lineNote" maxlength="200"></td>
+ <td><button type="button" class="btn ghost sm j-del">✕</button></td></tr></template>
+<script>(function(){
+var t=document.getElementById("jl"),tpl=document.getElementById("jtpl"),form=document.getElementById("jv");
+function inr(n){return "₹"+(Math.round(n*100)/100).toLocaleString("en-IN")}
+function add(){var tr=tpl.content.firstElementChild.cloneNode(true);t.appendChild(tr);
+ var s=tr.querySelector("select");if(window.enhanceSelect)window.enhanceSelect(s);
+ tr.querySelector(".j-del").addEventListener("click",function(){if(t.querySelectorAll(".jl-row").length>2){tr.remove();calc()}});
+ var dr=tr.querySelector(".j-dr"),cr=tr.querySelector(".j-cr");
+ dr.addEventListener("input",function(){if(dr.value)cr.value="";calc()});cr.addEventListener("input",function(){if(cr.value)dr.value="";calc()});return tr}
+function calc(){var d=0,c=0;t.querySelectorAll(".jl-row").forEach(function(r){d+=+r.querySelector(".j-dr").value||0;c+=+r.querySelector(".j-cr").value||0});
+ d=Math.round(d*100)/100;c=Math.round(c*100)/100;document.getElementById("jd").textContent=inr(d);document.getElementById("jc").textContent=inr(c);
+ var x=document.getElementById("jdiff");x.textContent=d===c?(d?"Balanced":""):"Difference "+inr(Math.abs(d-c));x.className=d===c?"muted":"out"}
+add();add();add();add();
+document.getElementById("jadd").addEventListener("click",function(){var r=add();var f=r.querySelector(".combo-in")||r.querySelector("select");f&&f.focus()});
+form.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.tagName==="INPUT"&&!e.defaultPrevented){e.preventDefault();var f=[].slice.call(form.querySelectorAll("input,select")).filter(function(x){return x.type!=="hidden"&&x.offsetParent!==null});var i=f.indexOf(e.target);if(f[i+1])f[i+1].focus()}});
+form.addEventListener("submit",function(e){
+ if(form.dataset.ok==="1")return;e.preventDefault();
+ var d=0,c=0,n=0;t.querySelectorAll(".jl-row").forEach(function(r){var a=r.querySelector("[name=accountId]").value,x=+r.querySelector(".j-dr").value||0,y=+r.querySelector(".j-cr").value||0;d+=x;c+=y;if(a||x||y)n++});
+ d=Math.round(d*100)/100;c=Math.round(c*100)/100;
+ if(n<2){alert("A journal needs at least two lines.");return}
+ if(d!==c){alert("Debit "+inr(d)+" and credit "+inr(c)+" must be equal.");return}
+ if(confirm("Save this journal entry for "+inr(d)+"?")){form.dataset.ok="1";form.submit()}
+});
+})();</script>
+{% endblock %}

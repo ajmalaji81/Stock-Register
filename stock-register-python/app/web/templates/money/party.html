@@ -12,7 +12,7 @@
 {% if can(actor, 'payments.manage') %}<div class="card"><h2>Record payment</h2>{{ pay_form(p.id, modes, today) }}</div>{% endif %}
 <div class="card"><h2>Ledger</h2>
 <form class="row" method="get"><label>From<input type="date" name="frm" value="{{ frm }}"></label><label>To<input type="date" name="to" value="{{ to }}"></label>
-<button class="btn">Apply</button><a class="btn ghost" href="/app/parties/{{ p.id }}/ledger.csv?frm={{ frm }}&to={{ to }}">CSV</a></form>
+<button class="btn">Apply</button><a class="btn ghost" href="/app/parties/{{ p.id }}/ledger.csv?frm={{ frm }}&to={{ to }}">CSV</a><a class="btn ghost" href="/app/parties/{{ p.id }}/ledger.pdf?frm={{ frm }}&to={{ to }}">PDF</a></form>
 <table><tr><th>Date</th><th>Particulars</th><th class="n">Debit</th><th class="n">Credit</th><th class="n">Balance</th></tr>
 {% for r in ledger.rows %}<tr><td>{{ r.date }}</td><td>{{ r.ref }}</td><td class="n">{{ r.debit|inr if r.debit }}</td><td class="n">{{ r.credit|inr if r.credit }}</td><td class="n">{{ r.balance|inr }}</td></tr>
 {% else %}<tr><td colspan="5" class="muted">No entries.</td></tr>{% endfor %}

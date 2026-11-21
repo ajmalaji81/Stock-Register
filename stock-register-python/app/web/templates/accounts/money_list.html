@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ label }}s · GodownBook{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">{{ label }}s</h1>
+ <a class="btn" href="/app/payments/new?direction={{ direction }}">+ New {{ label|lower }}</a></div>
+<p class="muted">{{ 'Money received from customers.' if direction == 'IN' else 'Money paid to suppliers.' }} A mistake is undone with Reverse, which adds an equal opposite entry.</p>
+<form class="card row" method="get">
+ <label>From<input type="date" name="frm" value="{{ frm }}"></label><label>To<input type="date" name="to" value="{{ to }}"></label><button class="btn">Filter</button></form>
+<div class="card"><table>
+<tr><th>Date</th><th>Party</th><th>Mode</th><th>Reference</th><th class="n">Amount</th><th>Notes</th><th>By</th><th></th></tr>
+{% for r in rows %}<tr {{ 'style=opacity:.55' if r.reversed or r.isReversal }}>
+ <td>{{ r.date }}</td><td><a href="/app/parties/{{ r.partyId }}">{{ r.party }}</a></td><td>{{ r.mode }}</td><td>{{ r.reference }}</td>
+ <td class="n">{{ r.amount|inr }}</td><td>{{ r.notes }}{% if r.reversed %}<br><small class="muted">Reversed</small>{% endif %}</td><td>{{ r.by }}</td>
+ <td>{% if not r.reversed and not r.isReversal %}<form class="inline" method="post" action="/app/payments/{{ r.id }}/reverse" onsubmit="return confirm('Reverse this {{ label|lower }} of {{ r.amount|inr }}?')"><input type="hidden" name="partyId" value="{{ r.partyId }}"><button class="btn ghost sm">Reverse</button></form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="8" class="muted">No {{ label|lower }}s in this period.</td></tr>{% endfor %}
+</table>{% if rows %}<p class="muted">Total (excluding reversed): <b>{{ total|inr }}</b></p>{% endif %}</div>
+{% endblock %}

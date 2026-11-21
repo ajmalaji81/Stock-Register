@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% from "display/books_macros.html" import period_form, download %}
+{% block title %}Transaction summary · GodownBook{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">Transaction summary</h1>{{ download(csv_url) }}</div>
+<p class="muted">Count and amount of each transaction type in the period. Cancelled entries are left out.</p>
+{{ period_form(frm, to) }}
+<div class="grid">
+ <div class="card stat">Net sales<b>{{ data.netSales|inr }}</b><small class="muted">sales − sales return</small></div>
+ <div class="card stat">Net purchases<b>{{ data.netPurchases|inr }}</b><small class="muted">purchase − purchase return</small></div>
+</div>
+<div class="card"><table><tr><th>Type</th><th class="n">Count</th><th class="n">Amount</th></tr>
+{% for r in data.rows %}<tr><td>{{ r.label }}</td><td class="n">{{ r.count }}</td><td class="n">{{ r.amount|inr }}</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

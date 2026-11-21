@@ -1,0 +1,15 @@
+{% macro period_form(frm, to, extra='') %}
+<form class="card row" method="get">
+ <label>From<input type="date" name="frm" value="{{ frm }}"></label><label>To<input type="date" name="to" value="{{ to }}"></label>
+ {{ extra|safe }}
+ <button class="btn">Show</button>
+</form>
+{% endmacro %}
+{% macro download(url) %}<a class="btn ghost sm" href="{{ url }}">⬇ Download Excel</a> <a class="btn ghost sm" href="{{ url|replace('format=csv', 'format=pdf') }}">⬇ Download PDF</a>{% endmacro %}
+{% macro side_tabs(side, as_on, path) %}
+<form class="card row" method="get" action="{{ path }}">
+ <label>Show<select name="side"><option value="receivable" {{ 'selected' if side == 'receivable' }}>Receivable (customers owe us)</option><option value="payable" {{ 'selected' if side == 'payable' }}>Payable (we owe suppliers)</option></select></label>
+ <label>As on<input type="date" name="as_on" value="{{ as_on }}"></label>
+ <button class="btn">Show</button>
+</form>
+{% endmacro %}

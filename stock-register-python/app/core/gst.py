@@ -136,14 +136,15 @@ def amount_in_words(amount: float) -> str:
 
 # ---------- Voucher kinds ----------
 
-VOUCHER_KINDS = ["SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN", "QUOTATION", "SALES_ORDER", "PURCHASE_ORDER", "CHALLAN"]
+VOUCHER_KINDS = ["SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN", "QUOTATION", "SALES_ORDER", "PURCHASE_ORDER", "CHALLAN", "PURCHASE_QUOTATION"]
 
 KIND_LABEL = {
     "SALE": "Sales invoice",
     "SALE_RETURN": "Sales return",
     "PURCHASE": "Purchase bill",
     "PURCHASE_RETURN": "Purchase return",
-    "QUOTATION": "Quotation",
+    "QUOTATION": "Sales quotation",
+    "PURCHASE_QUOTATION": "Purchase quotation",
     "SALES_ORDER": "Sales order",
     "PURCHASE_ORDER": "Purchase order",
     "CHALLAN": "Delivery challan",
@@ -152,7 +153,7 @@ KIND_LABEL = {
 #: Number prefix per kind. SALE uses the business's invoicePrefix instead.
 KIND_PREFIX = {
     "SALE": "INV", "SALE_RETURN": "SR", "PURCHASE": "PB", "PURCHASE_RETURN": "PR",
-    "QUOTATION": "QT", "SALES_ORDER": "SO", "PURCHASE_ORDER": "PO", "CHALLAN": "DC",
+    "QUOTATION": "QT", "SALES_ORDER": "SO", "PURCHASE_ORDER": "PO", "CHALLAN": "DC", "PURCHASE_QUOTATION": "PQ",
 }
 
 
@@ -170,13 +171,14 @@ CONVERSIONS: dict[str, list[str]] = {
     "QUOTATION": ["SALES_ORDER", "SALE"],
     "SALES_ORDER": ["SALE"],
     "PURCHASE_ORDER": ["PURCHASE"],
+    "PURCHASE_QUOTATION": ["PURCHASE_ORDER", "PURCHASE"],
     "CHALLAN": ["SALE"],
 }
 
 
 def is_purchase_side(kind: str) -> bool:
     """Purchase-side kinds use the supplier view (cost rates)."""
-    return kind in ("PURCHASE", "PURCHASE_RETURN", "PURCHASE_ORDER")
+    return kind in ("PURCHASE", "PURCHASE_RETURN", "PURCHASE_ORDER", "PURCHASE_QUOTATION")
 
 
 def format_number(prefix: str, seq: int) -> str:

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}IMEI wise stock · GodownBook{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">IMEI wise stock</h1>
+ <a class="btn ghost" href="{{ request.url.include_query_params(format='csv') }}">⬇ Download Excel</a>
+ <a class="btn ghost" href="{{ request.url.include_query_params(format='pdf') }}">⬇ Download PDF</a></div>
+<p class="muted">How many phones (IMEIs) of each model are in stock, sold or returned, per shop / godown. Open a model to list its IMEIs; click an IMEI for its history (<a href="/app/serials">Serial no. history</a>).</p>
+{% if d.mismatches %}<div class="flash err" style="margin:0 0 14px"><b>Stock and IMEI counts differ</b> for:
+ {% for m in d.mismatches %}{{ m.item }} at {{ m.godown }} (stock {{ m.stock|qty }}, IMEIs {{ m.units }}){{ '; ' if not loop.last }}{% endfor %}.</div>{% endif %}
+<form method="get" class="card row">
+ <label>Model<select name="item" data-search><option value="">All tracked models</option>{% for i in d.tracked %}<option value="{{ i.id }}" {{ 'selected' if d.item == i.id }}>{{ i.name }}</option>{% endfor %}</select></label>
+ <label>Shop / godown<select name="godown"><option value="">All</option>{% for g in d.godowns %}<option value="{{ g.id }}" {{ 'selected' if d.godown == g.id }}>{{ g.name }}</option>{% endfor %}</select></label>
+ <label>IMEI<input name="q" value="{{ d.q }}" placeholder="Full or last digits (with a model)"></label>
+ <button class="btn">Show</button>
+</form>
+<div class="grid">
+ <div class="card stat"><span class="muted">In stock</span><b class="in">{{ d.totals.inStock }}</b></div>
+ <div class="card stat"><span class="muted">Sold</span><b>{{ d.totals.sold }}</b></div>
+ <div class="card stat"><span class="muted">Returned to supplier</span><b>{{ d.totals.returned }}</b></div>
+</div>
+<div class="card"><table>
+<tr><th>Model</th><th>Godown</th><th class="n">In stock</th><th class="n">Sold</th><th class="n">Returned</th><th class="n">Total</th><th class="n">Stock qty</th><th></th></tr>
+{% for r in d.rows %}<tr>
+ <td>{{ r.item }}</td><td>{{ r.godown }}</td><td class="n in"><b>{{ r.inStock }}</b></td><td class="n">{{ r.sold }}</td><td class="n">{{ r.returned }}</td><td class="n">{{ r.total }}</td>
+ <td class="n {{ 'low' if r.mismatch }}">{{ r.stock|qty if r.stock is not none else '—' }}{% if r.mismatch %} ⚠{% endif %}</td>
+ <td>{% if r.inStock %}<a class="btn ghost sm" href="?item={{ r.itemId }}&godown={{ r.godownId }}#imeis">IMEIs</a>{% endif %}</td></tr>
+{% else %}<tr><td colspan="8" class="muted">No IMEI-tracked phones yet. Turn on “Track every unit by IMEI” on an item.</td></tr>{% endfor %}
+</table></div>
+{% if d.item and d.itemName %}
+<div class="card" id="imeis"><h2 style="margin-top:0">{{ d.itemName }} — IMEIs in stock{% if d.godown %} · {{ d.godowns|selectattr('id', 'equalto', d.godown)|map(attribute='name')|first }}{% endif %}</h2>
+<table><tr><th>IMEI</th><th>IMEI 2</th><th>Godown</th></tr>
+{% for u in d.imeis %}<tr><td><a href="/app/serials/{{ u.imei }}"><b>{{ u.imei }}</b></a></td><td>{{ u.imei2 or '—' }}</td><td>{{ u.godown }}</td></tr>
+{% else %}<tr><td colspan="3" class="muted">No IMEIs in stock for this selection.</td></tr>{% endfor %}</table>
+{% if d.more %}<p class="muted">{{ d.more }} more not shown. Type more IMEI digits to narrow it, or download the Excel file for the first {{ d.imeis|length }}.</p>{% endif %}</div>
+{% endif %}
+{% endblock %}

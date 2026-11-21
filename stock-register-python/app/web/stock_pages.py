@@ -16,12 +16,18 @@ from ..core.errors import StockError
 from ..core.jsmath import round2
 from ..core.plans import limits_for
 from ..db import session_scope
-from ..services import parties, staff, stock
+from ..services import inventory, parties, staff, stock
 from .common import need, page_actor, redirect, render, selected_fy
 
 router = APIRouter()
 
 ENTRY_TYPES = ["OPENING", "IN", "OUT", "TRANSFER_IN", "TRANSFER_OUT", "ADJUSTMENT"]
+
+
+def _safe_next(next_url: str, default: str) -> str:
+    """Where to go after a form: only a page inside the app (/app/...), never an outside address."""
+    n = (next_url or "").strip()
+    return n if n.startswith("/app/") and "//" not in n and "\\" not in n else default
 
 
 def _msg(e: Exception) -> str:
@@ -161,6 +167,12 @@ def dashboard(request: Request, scope: str = "ALL", view: str = "month", p: str 
 # ---------------- items ----------------
 
 
+def _group_names(actor) -> list[str]:
+    """Item group names for the category suggestions (needs its own session: items_page closed its one)."""
+    with session_scope() as db:
+        return inventory.group_names(db, actor)
+
+
 @router.get("/app/items")
 def items_page(request: Request, scope: str = "ALL", q: str = "", edit: str = ""):
     with session_scope() as db:
@@ -170,7 +182,7 @@ def items_page(request: Request, scope: str = "ALL", q: str = "", edit: str = ""
     editing = next((i for i in ws["items"] if i["id"] == edit), None)
     return render(
         request, "stock/items.html", actor, "items", ws=ws, scope=scope, q=q, rows=_rows(ws, scope, q), editing=editing,
-        costs=actor.can("costs.view"), today=today_iso(),
+        costs=actor.can("costs.view"), today=today_iso(), groups=_group_names(actor),
     )
 
 
@@ -197,6 +209,7 @@ def item_save(
             stock.update_item(db, actor, id, inp)
         else:
             stock.create_item(db, actor, inp)
+        inventory.ensure_group(db, actor.account_id, inp.category)  # a new category becomes an item group
 
     return act(request, ("items.manage",), "/app/items", "Item saved", work)
 
@@ -209,7 +222,7 @@ def item_delete(item_id: str, request: Request):
 @router.post("/app/stock/move")
 def stock_move(
     request: Request, itemId: str = Form(""), godownId: str = Form(""), type: str = Form("IN"), qty: str = Form(""),
-    rate: str = Form("0"), party: str = Form(""), remarks: str = Form(""), date: str = Form(""),
+    rate: str = Form("0"), party: str = Form(""), remarks: str = Form(""), date: str = Form(""), next: str = Form(""),
 ):
     def work(db, actor):
         inp = S.MovementInput.model_validate(
@@ -218,13 +231,13 @@ def stock_move(
         )
         stock.record_movement(db, actor, inp)
 
-    return act(request, ("stock.move",), "/app/items", "Stock updated", work)
+    return act(request, ("stock.move",), _safe_next(next, "/app/items"), "Stock updated", work)
 
 
 @router.post("/app/stock/transfer")
 def stock_transfer(
     request: Request, itemId: str = Form(""), fromGodownId: str = Form(""), toGodownId: str = Form(""), qty: str = Form(""),
-    remarks: str = Form(""), date: str = Form(""), serials: str = Form(""),
+    remarks: str = Form(""), date: str = Form(""), serials: str = Form(""), next: str = Form(""),
 ):
     def work(db, actor):
         inp = S.TransferInput.model_validate(
@@ -233,7 +246,7 @@ def stock_transfer(
         )
         stock.transfer_stock(db, actor, inp)
 
-    return act(request, ("stock.transfer",), "/app/items", "Stock transferred", work)
+    return act(request, ("stock.transfer",), _safe_next(next, "/app/items"), "Stock transferred", work)
 
 
 # ---------------- ledger ----------------
@@ -246,8 +259,11 @@ def _ledger_filters(itemId: str, godownId: str, type: str, from_: str, to: str) 
     return {"itemId": q.itemId, "godownId": q.godownId, "type": q.type, "from": q.from_, "to": q.to}
 
 
+LEDGER_PAGE_SIZE = 20
+
+
 @router.get("/app/ledger")
-def ledger_page(request: Request, itemId: str = "", godownId: str = "", type: str = "", to: str = ""):
+def ledger_page(request: Request, itemId: str = "", godownId: str = "", type: str = "", to: str = "", page: str = "1"):
     from_ = request.query_params.get("from", "")
     with session_scope() as db:
         actor = page_actor(db, request)
@@ -258,8 +274,15 @@ def ledger_page(request: Request, itemId: str = "", godownId: str = "", type: st
             err = ""
         except (StockError, ValidationError) as e:
             entries, err = [], _msg(e)
+    entries = list(reversed(entries))
+    total = len(entries)
+    pages = max(1, -(-total // LEDGER_PAGE_SIZE))
+    page = min(max(int(page) if page.strip().isdigit() else 1, 1), pages)
+    start = (page - 1) * LEDGER_PAGE_SIZE
+    entries = entries[start:start + LEDGER_PAGE_SIZE]
     return render(
-        request, "stock/ledger.html", actor, "ledger", ws=ws, entries=list(reversed(entries)), err=err, types=ENTRY_TYPES,
+        request, "stock/ledger.html", actor, "ledger", ws=ws, entries=entries, err=err, types=ENTRY_TYPES,
+        page=page, pages=pages, total=total, first=start + 1 if total else 0, last=start + len(entries),
         f={"itemId": itemId, "godownId": godownId, "type": type, "from": from_, "to": to}, costs=actor.can("costs.view"),
     )
 

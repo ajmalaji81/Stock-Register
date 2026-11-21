@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · GodownBook{% endblock %}
+{% block content %}
+{% set sale = d.side == 'sale' %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">{{ title }}</h1>
+ <a class="btn ghost" href="{{ request.url.include_query_params(format='csv') }}">⬇ Download Excel</a>
+ <a class="btn ghost" href="{{ request.url.include_query_params(format='pdf') }}">⬇ Download PDF</a></div>
+<p class="muted">{{ 'Sales invoices less sales returns' if sale else 'Purchase bills less purchase returns' }}, cancelled bills left out. Old-year records are included, like the Sales &amp; GST report.</p>
+<form method="get" class="card row">
+ <input type="hidden" name="by" value="{{ d.by }}">
+ <label>From<input type="date" name="from" value="{{ d['from'] }}"></label><label>To<input type="date" name="to" value="{{ d.to }}"></label>
+ <label>Godown<select name="godown"><option value="">All godowns</option>{% for g in d.godowns %}<option value="{{ g.id }}" {{ 'selected' if d.godown == g.id }}>{{ g.name }}</option>{% endfor %}</select></label>
+ <button class="btn">Show</button>
+</form>
+<div class="row print-hide" style="margin:0 0 10px;gap:6px">
+ {% for k, lbl in by_label.items() %}<a class="btn {{ '' if d.by == k else 'ghost' }} sm" style="flex:0" href="{{ request.url.include_query_params(by=k) }}">By {{ lbl|lower }}</a>{% endfor %}
+</div>
+<div class="grid">
+ <div class="card stat"><span class="muted">Net {{ 'sales' if sale else 'purchases' }}</span><b>{{ d.totals.net|inr }}</b></div>
+ <div class="card stat"><span class="muted">Returns</span><b class="out">{{ d.totals.returns|inr }}</b></div>
+ <div class="card stat"><span class="muted">Bills</span><b>{{ d.bills }}</b></div>
+ {% if sale and d.costs %}<div class="card stat"><span class="muted">Gross profit</span><b class="in">{{ d.totals.profit|inr }}</b><small class="muted">{{ d.totals.margin }}% margin</small></div>{% endif %}
+</div>
+{% if d.bars %}<div class="card"><b>Top {{ d.bars|length }} by {{ by_label[d.by]|lower }}</b>
+ {% for b in d.bars %}<div style="display:flex;align-items:center;gap:10px;margin:6px 0;font-size:13px">
+  <span style="width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ b.label }}">{{ b.label }}</span>
+  <div style="flex:1;background:var(--soft);border-radius:6px;height:14px"><div style="width:{{ b.pct }}%;height:100%;border-radius:6px;background:var(--brand)"></div></div>
+  <span style="width:110px;text-align:right">{{ b.net|inr }}</span></div>{% endfor %}</div>{% endif %}
+<div class="card"><table>
+<tr><th>{{ by_label[d.by] }}</th><th class="n">Bills</th><th class="n">Qty</th><th class="n">Taxable</th><th class="n">Tax</th><th class="n">{{ 'Sales' if sale else 'Purchases' }}</th><th class="n">Returns</th><th class="n">Net</th><th class="n">Share</th>
+{% if sale and d.costs %}<th class="n">Cost</th><th class="n">Profit</th><th class="n">Margin</th>{% endif %}</tr>
+{% for r in d.rows %}<tr><td>{{ r.label }}</td><td class="n">{{ r.bills }}</td><td class="n">{{ r.qty|qty }}</td><td class="n">{{ r.taxable|inr }}</td><td class="n">{{ r.tax|inr }}</td>
+ <td class="n">{{ r.gross|inr }}</td><td class="n out">{{ r.returns|inr if r.returns }}</td><td class="n"><b>{{ r.net|inr }}</b></td><td class="n">{{ r.share }}%</td>
+ {% if sale and d.costs %}<td class="n">{{ r.cost|inr }}</td><td class="n">{{ r.profit|inr }}</td><td class="n">{{ r.margin }}%</td>{% endif %}</tr>
+{% else %}<tr><td colspan="12" class="muted">Nothing in this period.</td></tr>{% endfor %}
+{% if d.rows %}{% set t = d.totals %}<tr style="font-weight:700"><td>Total</td><td class="n">{{ d.bills }}</td><td class="n">{{ t.qty|qty }}</td><td class="n">{{ t.taxable|inr }}</td><td class="n">{{ t.tax|inr }}</td><td class="n">{{ t.gross|inr }}</td><td class="n">{{ t.returns|inr }}</td><td class="n">{{ t.net|inr }}</td><td></td>
+ {% if sale and d.costs %}<td class="n">{{ t.cost|inr }}</td><td class="n">{{ t.profit|inr }}</td><td class="n">{{ t.margin }}%</td>{% endif %}</tr>
+<tr><td colspan="7" class="muted">Round off on the bills</td><td class="n">{{ d.roundOff|inr }}</td><td colspan="4"></td></tr>
+<tr><td colspan="7"><b>Net bill total</b> <small class="muted">(matches the bills)</small></td><td class="n"><b>{{ d.billTotal|inr }}</b></td><td colspan="4"></td></tr>{% endif %}
+</table></div>
+{% endblock %}

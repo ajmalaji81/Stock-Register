@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Item groups · GodownBook{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0">Item groups</h1>
+{% if can_edit %}<button type="button" class="btn" id="grp-new">+ New group</button>{% endif %}</div>
+<p class="muted">Group your items (for example Mobiles, Accessories, Chargers). A group is also the item's category, so it appears on the Items page.</p>
+<div class="card"><table>
+<tr><th>Group</th><th class="n">Items</th><th></th></tr>
+{% for g in groups %}<tr>
+ <td><b>{{ g.name }}</b></td>
+ <td class="n">{% if g['items'] %}<a href="/app/items?q={{ g.name|urlencode }}">{{ g['items'] }}</a>{% else %}0{% endif %}</td>
+ <td style="white-space:nowrap">{% if can_edit %}
+  <button type="button" class="btn ghost sm" data-rename="{{ g.id }}" data-name="{{ g.name }}">Rename</button>
+  {% if not g['items'] %}<form class="inline" method="post" action="/app/masters/item-groups/{{ g.id }}/delete" onsubmit="return confirm('Delete this group?')"><button class="btn danger sm">Delete</button></form>{% endif %}
+ {% endif %}</td></tr>
+{% else %}<tr><td colspan="3" class="muted">No groups yet.</td></tr>{% endfor %}
+</table></div>
+
+{% if can_edit %}
+<div class="modal" id="grp-modal" hidden><div class="modal-card" style="width:min(420px,100%)">
+ <h2 style="margin:0" id="grp-title">New group</h2>
+ <form method="post" action="/app/masters/item-groups" id="grp-form">
+  <label>Name<input name="name" id="grp-name" maxlength="60" required></label>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn ghost" id="grp-cancel">Cancel</button><button class="btn">Save</button></div>
+ </form></div></div>
+<script>(function(){
+var m=document.getElementById("grp-modal"),f=document.getElementById("grp-form"),n=document.getElementById("grp-name"),t=document.getElementById("grp-title");
+function open(){m.hidden=false;n.focus();n.select()}function close(){m.hidden=true}
+document.getElementById("grp-new").addEventListener("click",function(){f.action="/app/masters/item-groups";n.value="";t.textContent="New group";open()});
+document.querySelectorAll("[data-rename]").forEach(function(b){b.addEventListener("click",function(){f.action="/app/masters/item-groups/"+b.dataset.rename+"/rename";n.value=b.dataset.name;t.textContent="Rename group";open()})});
+document.getElementById("grp-cancel").addEventListener("click",close);
+m.addEventListener("mousedown",function(e){if(e.target===m)close()});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!m.hidden)close()});
+})();</script>
+{% endif %}
+{% endblock %}

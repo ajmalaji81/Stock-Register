@@ -393,3 +393,68 @@ class SerialEvent(Base):
     actorName: Mapped[str] = mapped_column(String, default="")
     voided: Mapped[bool] = mapped_column(Boolean, default=False)
     createdAt: Mapped[datetime] = _created()
+
+
+class Account(Base):
+    """Chart of accounts: account -> sub account -> sub-sub account (parentId points one level up)."""
+
+    __tablename__ = "Account"
+    __table_args__ = (UniqueConstraint("userId", "parentId", "name"), Index("Account_userId_parentId_idx", "userId", "parentId"))
+
+    id: Mapped[str] = _id()
+    userId: Mapped[str] = mapped_column(ForeignKey("User.id", ondelete="CASCADE"))
+    parentId: Mapped[Optional[str]] = mapped_column(ForeignKey("Account.id", ondelete="RESTRICT"), nullable=True)
+    name: Mapped[str] = mapped_column(String)
+    type: Mapped[str] = mapped_column(String)  # ASSET | LIABILITY | EQUITY | INCOME | EXPENSE (the same for a whole branch)
+    depth: Mapped[int] = mapped_column(Integer, default=1)  # 1 = top level, 2 = sub account, 3 = sub-sub account
+    openingBalance: Mapped[float] = mapped_column(Float, default=0)  # debit positive, credit negative
+    isGroup: Mapped[bool] = mapped_column(Boolean, default=False)  # an account GROUP holds other nodes; entries post only to non-group accounts (ledgers)
+    createdAt: Mapped[datetime] = _created()
+
+
+class AccountVoucher(Base):
+    """Journal entries, credit notes and debit notes (no stock, no items)."""
+
+    __tablename__ = "AccountVoucher"
+    __table_args__ = (UniqueConstraint("userId", "kind", "number"), Index("AccountVoucher_userId_kind_date_idx", "userId", "kind", "date"))
+
+    id: Mapped[str] = _id()
+    userId: Mapped[str] = mapped_column(ForeignKey("User.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(String)  # JOURNAL | CREDIT_NOTE | DEBIT_NOTE
+    number: Mapped[str] = mapped_column(String)
+    date: Mapped[str] = mapped_column(String)
+    partyId: Mapped[Optional[str]] = mapped_column(ForeignKey("Party.id", ondelete="RESTRICT"), nullable=True)
+    accountId: Mapped[Optional[str]] = mapped_column(ForeignKey("Account.id", ondelete="RESTRICT"), nullable=True)  # a note's other side
+    amount: Mapped[float] = mapped_column(Float, default=0)
+    narration: Mapped[str] = mapped_column(String, default="")
+    status: Mapped[str] = mapped_column(String, default="OPEN")  # OPEN | CANCELLED
+    createdBy: Mapped[str] = mapped_column(String, default="")
+    createdAt: Mapped[datetime] = _created()
+
+    entries: Mapped[list["AccountEntry"]] = relationship(cascade="all, delete-orphan", passive_deletes=True, order_by="AccountEntry.id")
+    party: Mapped[Optional["Party"]] = relationship()
+
+
+class AccountEntry(Base):
+    __tablename__ = "AccountEntry"
+
+    id: Mapped[str] = _id()
+    voucherId: Mapped[str] = mapped_column(ForeignKey("AccountVoucher.id", ondelete="CASCADE"))
+    accountId: Mapped[str] = mapped_column(ForeignKey("Account.id", ondelete="RESTRICT"))
+    debit: Mapped[float] = mapped_column(Float, default=0)
+    credit: Mapped[float] = mapped_column(Float, default=0)
+    narration: Mapped[str] = mapped_column(String, default="")
+
+    account: Mapped["Account"] = relationship()
+
+
+class ItemGroup(Base):
+    """A named group for items (Item.category holds the group's name)."""
+
+    __tablename__ = "ItemGroup"
+    __table_args__ = (UniqueConstraint("userId", "name"),)
+
+    id: Mapped[str] = _id()
+    userId: Mapped[str] = mapped_column(ForeignKey("User.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String)
+    createdAt: Mapped[datetime] = _created()

@@ -148,6 +148,16 @@ def test_inter_state_sale_uses_igst(client):
     assert r["interState"] is True and r["igst"] == 90 and r["cgst"] == 0 and r["sgst"] == 0 and r["total"] == 1890
 
 
+def test_tax_type_on_the_bill_decides_igst_or_local(client):
+    signup(client)
+    g, item, party = _setup_sale_world(client)
+    a = client.post("/api/vouchers", json=sale_body(g, item, party, qty=1, taxType="IGST")).json()
+    assert a["interState"] is True and a["igst"] == 90 and a["cgst"] == 0
+    b = client.post("/api/vouchers", json=sale_body(g, item, party, qty=1, placeOfSupply="Kerala", taxType="LOCAL")).json()
+    assert b["interState"] is False and b["igst"] == 0 and b["cgst"] == 45 and b["sgst"] == 45
+    assert client.post("/api/vouchers", json=sale_body(g, item, party, qty=1, taxType="bad")).status_code == 400
+
+
 def test_sale_cannot_oversell_and_rolls_back(client):
     signup(client)
     g, item, party = _setup_sale_world(client)

@@ -88,12 +88,14 @@
   }
 
   function interState() {
-    var pos = document.getElementById("pos").value;
+    var tt = document.getElementById("taxtype").value;  // LOCAL / IGST chosen on the bill, "" = follow the party
     var gs = form.elements.godownId, go = gs && gs.options[gs.selectedIndex];
     var home = (go && go.getAttribute("data-state")) || form.dataset.businessState;  // the billing godown's own state
-    var st = pos || partyState || home;
-    var a = norm(home), b = norm(st);
-    return document.getElementById("gst").checked && a !== "" && b !== "" && a !== b;
+    if (!document.getElementById("gst").checked) return false;
+    if (tt === "IGST") return true;
+    if (tt === "LOCAL") return false;
+    var a = norm(home), b = norm(partyState || home);
+    return a !== "" && b !== "" && a !== b;
   }
 
   // ---------- lines ----------
@@ -191,6 +193,7 @@
     table.appendChild(tr);
     if (window.enhanceSelect) window.enhanceSelect(sel);
     serialUI(tr);
+    return tr;
   }
 
   // ---------- split payments ----------
@@ -366,8 +369,13 @@
   }
 
   // ---------- submit guard ----------
+  var confirmed = false;
   form.addEventListener("submit", function (e) {
     var msg = "";
+    var rows = Array.prototype.slice.call(table.querySelectorAll("tr.line"));
+    var filled = rows.filter(function (tr) { return tr.querySelector(".f-item").value; });
+    if (!filled.length) msg = "Add at least one item.";
+    else rows.forEach(function (tr) { if (!tr.querySelector(".f-item").value) tr.remove(); });  // an unused blank line is dropped
     if (qBox && qBox.value.trim() && !hidden.value) msg = "Pick the party from the list (or clear the box for a cash sale).";
     if (!msg) table.querySelectorAll("tr.line").forEach(function (tr) {
       if (msg || tr.querySelector(".serial-box").hidden) return;
@@ -382,7 +390,56 @@
       });
       if (!msg && paid() > total + 0.005) msg = "Payments are more than the bill total.";
     }
-    if (msg) { e.preventDefault(); alert(msg); }
+    if (msg) { e.preventDefault(); alert(msg); return; }
+    if (!confirmed) { e.preventDefault(); askSave(); }
+  });
+
+  // ---------- confirm before saving ----------
+  function askSave() {
+    var old = document.getElementById("save-confirm"); if (old) old.remove();
+    var box = document.createElement("div");
+    box.className = "modal"; box.id = "save-confirm"; box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true");
+    var edit = !!voucherId;
+    box.innerHTML = '<div class="modal-card" style="width:min(380px,100%)"><h2 style="margin:0">' + (edit ? "Save changes?" : "Save this bill?") + '</h2>' +
+      '<p class="muted" style="margin:0">Total <b>' + document.getElementById("t-total").textContent + '</b> · ' +
+      table.querySelectorAll("tr.line").length + ' item line(s)</p>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px"><button type="button" class="btn ghost" data-no>Cancel</button><button type="button" class="btn" data-yes>Save</button></div></div>';
+    document.body.appendChild(box);
+    var yes = box.querySelector("[data-yes]"), no = box.querySelector("[data-no]");
+    function close() { document.removeEventListener("keydown", onKey, true); box.remove(); }
+    function onKey(ev) { if (ev.key === "Escape") { ev.preventDefault(); close(); } }
+    document.addEventListener("keydown", onKey, true);
+    no.addEventListener("click", close);
+    box.addEventListener("mousedown", function (ev) { if (ev.target === box) close(); });
+    yes.addEventListener("click", function () { confirmed = true; close(); try { form.requestSubmit(); } finally { confirmed = false; } });
+    yes.focus();
+  }
+
+  // ---------- Enter never saves: it moves on, and after the last field of the last line it opens a new line ----------
+  form.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" || e.defaultPrevented) return;
+    var t = e.target;
+    if (!t || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.type === "submit" || t.type === "button" || t.type === "checkbox") return;
+    if (t.closest(".modal") || t.id === "pos-scan") return;
+    e.preventDefault();  // never submit the bill from the keyboard
+    var fields = Array.prototype.slice.call(form.querySelectorAll("input,select,textarea")).filter(function (el) {
+      return !el.disabled && el.type !== "hidden" && el.type !== "file" && el.offsetParent !== null && el.tabIndex !== -1;
+    });
+    var tr = t.closest("tr.line");
+    var rowFields = tr ? fields.filter(function (el) { return tr.contains(el); }) : [];
+    if (tr && rowFields[rowFields.length - 1] === t) {
+      var lines = Array.prototype.slice.call(table.querySelectorAll("tr.line"));
+      var next = lines[lines.indexOf(tr) + 1];
+      if (!next) {  // finished the last line: start a new one, ready to pick the item (✕ removes it if not needed)
+        if (!tr.querySelector(".f-item").value) return;
+        next = addLine();
+      }
+      var first = next.querySelector(".combo-in") || next.querySelector(".f-item");
+      if (first) { first.focus(); if (first.select) first.select(); }
+      return;
+    }
+    var i = fields.indexOf(t);
+    if (i >= 0 && fields[i + 1]) fields[i + 1].focus();
   });
 
   document.getElementById("add").addEventListener("click", function () { addLine(); });
@@ -420,7 +477,7 @@
     var f = function (n) { var el = form.elements[n]; return el ? (el.type === "checkbox" ? el.checked : el.value) : ""; };
     var snap = {
       url: here, ts: Date.now(),
-      head: { date: f("date"), godownId: f("godownId"), placeOfSupply: f("placeOfSupply"), gstEnabled: f("gstEnabled"),
+      head: { date: f("date"), godownId: f("godownId"), taxType: f("taxType"), gstEnabled: f("gstEnabled"),
               notes: f("notes"), schemeInfo: f("schemeInfo"), paymentInfo: f("paymentInfo") },
       party: { id: hidden ? hidden.value : "", text: qBox ? qBox.value : "" },
       lines: Array.prototype.map.call(table.querySelectorAll("tr.line"), function (tr) {
